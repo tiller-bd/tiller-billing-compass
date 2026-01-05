@@ -27,36 +27,36 @@ export function RevenueChart({ data }: RevenueChartProps) {
           <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(173, 80%, 40%)" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="hsl(173, 80%, 40%)" stopOpacity={0} />
+                <stop offset="0%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 18%)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
             <XAxis 
               dataKey="month" 
               axisLine={false}
               tickLine={false}
-              tick={{ fill: 'hsl(215, 20%, 55%)', fontSize: 12 }}
+              tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }}
             />
             <YAxis 
               axisLine={false}
               tickLine={false}
-              tick={{ fill: 'hsl(215, 20%, 55%)', fontSize: 12 }}
+              tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }}
               tickFormatter={(value) => `${value}M`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(222, 47%, 10%)',
-                border: '1px solid hsl(222, 30%, 18%)',
+                backgroundColor: 'hsl(0, 0%, 100%)',
+                border: '1px solid hsl(214, 20%, 88%)',
                 borderRadius: '8px',
-                color: 'hsl(210, 40%, 98%)',
+                color: 'hsl(222, 47%, 11%)',
               }}
               formatter={(value: number) => [`৳${value}M`, 'Received']}
             />
             <Area
               type="monotone"
               dataKey="received"
-              stroke="hsl(173, 80%, 40%)"
+              stroke="hsl(173, 80%, 36%)"
               strokeWidth={2}
               fill="url(#revenueGradient)"
             />

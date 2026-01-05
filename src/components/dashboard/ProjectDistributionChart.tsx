@@ -37,10 +37,10 @@ export function ProjectDistributionChart({ data }: ProjectDistributionChartProps
             </Pie>
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(222, 47%, 10%)',
-                border: '1px solid hsl(222, 30%, 18%)',
+                backgroundColor: 'hsl(0, 0%, 100%)',
+                border: '1px solid hsl(214, 20%, 88%)',
                 borderRadius: '8px',
-                color: 'hsl(210, 40%, 98%)',
+                color: 'hsl(222, 47%, 11%)',
               }}
               formatter={(value: number) => [`${value} projects`, '']}
             />
@@ -48,7 +48,7 @@ export function ProjectDistributionChart({ data }: ProjectDistributionChartProps
               verticalAlign="bottom"
               iconType="circle"
               formatter={(value) => (
-                <span style={{ color: 'hsl(215, 20%, 55%)', fontSize: '12px' }}>{value}</span>
+                <span style={{ color: 'hsl(215, 16%, 47%)', fontSize: '12px' }}>{value}</span>
               )}
             />
           </PieChart>

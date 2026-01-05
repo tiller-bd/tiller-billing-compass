@@ -25,12 +25,12 @@ export function BudgetComparisonChart({ data }: BudgetComparisonChartProps) {
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 18%)" horizontal={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" horizontal={false} />
             <XAxis 
               type="number"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: 'hsl(215, 20%, 55%)', fontSize: 12 }}
+              tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }}
               tickFormatter={(value) => `${value}M`}
             />
             <YAxis 
@@ -38,15 +38,15 @@ export function BudgetComparisonChart({ data }: BudgetComparisonChartProps) {
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: 'hsl(215, 20%, 55%)', fontSize: 11 }}
+              tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 11 }}
               width={100}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(222, 47%, 10%)',
-                border: '1px solid hsl(222, 30%, 18%)',
+                backgroundColor: 'hsl(0, 0%, 100%)',
+                border: '1px solid hsl(214, 20%, 88%)',
                 borderRadius: '8px',
-                color: 'hsl(210, 40%, 98%)',
+                color: 'hsl(222, 47%, 11%)',
               }}
               formatter={(value: number) => [`৳${value.toFixed(1)}M`, '']}
             />
@@ -54,13 +54,13 @@ export function BudgetComparisonChart({ data }: BudgetComparisonChartProps) {
               verticalAlign="top"
               iconType="circle"
               formatter={(value) => (
-                <span style={{ color: 'hsl(215, 20%, 55%)', fontSize: '12px' }}>
+                <span style={{ color: 'hsl(215, 16%, 47%)', fontSize: '12px' }}>
                   {value === 'received' ? 'Received' : 'Remaining'}
                 </span>
               )}
             />
-            <Bar dataKey="received" stackId="a" fill="hsl(173, 80%, 40%)" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="remaining" stackId="a" fill="hsl(222, 30%, 25%)" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="received" stackId="a" fill="hsl(173, 80%, 36%)" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="remaining" stackId="a" fill="hsl(214, 20%, 85%)" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

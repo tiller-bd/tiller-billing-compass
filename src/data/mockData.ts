@@ -200,8 +200,8 @@ export function getMonthlyRevenue(projects: Project[]) {
 
 export function getProjectDistribution(projects: Project[]) {
   return [
-    { name: 'Software Dev', value: projects.filter(p => p.category === 'SOFTWARE_DEV').length, color: 'hsl(173, 80%, 40%)' },
-    { name: 'Planning Dev', value: projects.filter(p => p.category === 'PLANNING_DEV').length, color: 'hsl(190, 80%, 35%)' },
+    { name: 'Software Dev', value: projects.filter(p => p.category === 'SOFTWARE_DEV').length, color: 'hsl(173, 80%, 36%)' },
+    { name: 'Planning Dev', value: projects.filter(p => p.category === 'PLANNING_DEV').length, color: 'hsl(190, 70%, 40%)' },
   ];
 }
 
