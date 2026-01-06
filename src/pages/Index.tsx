@@ -5,6 +5,7 @@ import {
   TrendingDown,
   FolderKanban 
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
@@ -13,6 +14,7 @@ import { BudgetComparisonChart } from '@/components/dashboard/BudgetComparisonCh
 import { UpcomingDeadlines } from '@/components/dashboard/UpcomingDeadlines';
 import { LastReceived } from '@/components/dashboard/LastReceived';
 import { ProjectTable } from '@/components/projects/ProjectTable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   mockProjects,
   calculateDashboardMetrics,
@@ -23,6 +25,7 @@ import {
 
 const Index = () => {
   const [currentPath, setCurrentPath] = useState('/');
+  const navigate = useNavigate();
   
   const metrics = calculateDashboardMetrics(mockProjects);
   const monthlyRevenue = getMonthlyRevenue(mockProjects);
@@ -38,11 +41,16 @@ const Index = () => {
     }).format(amount);
   };
 
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    navigate(path);
+  };
+
   return (
     <DashboardLayout
       title="Dashboard"
       currentPath={currentPath}
-      onNavigate={setCurrentPath}
+      onNavigate={handleNavigate}
     >
       <div className="space-y-6">
         {/* Metrics Grid */}
@@ -81,24 +89,32 @@ const Index = () => {
           />
         </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <RevenueChart data={monthlyRevenue} />
-          <BudgetComparisonChart data={budgetByProject} />
-        </div>
+        {/* Tabs for Charts / Projects Table */}
+        <Tabs defaultValue="charts" className="w-full">
+          <TabsList className="glass-card mb-4">
+            <TabsTrigger value="charts">Charts Overview</TabsTrigger>
+            <TabsTrigger value="projects">All Projects</TabsTrigger>
+          </TabsList>
 
-        {/* Secondary Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <ProjectDistributionChart data={projectDistribution} />
-          <LastReceived data={metrics.lastReceived} />
-          <UpcomingDeadlines deadlines={metrics.upcomingDeadlines} />
-        </div>
+          <TabsContent value="charts" className="space-y-6">
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <RevenueChart data={monthlyRevenue} />
+              <BudgetComparisonChart data={budgetByProject} />
+            </div>
 
-        {/* Projects Table */}
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">All Projects</h2>
-          <ProjectTable projects={mockProjects} />
-        </div>
+            {/* Secondary Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <ProjectDistributionChart data={projectDistribution} />
+              <LastReceived data={metrics.lastReceived} />
+              <UpcomingDeadlines deadlines={metrics.upcomingDeadlines} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="projects">
+            <ProjectTable projects={mockProjects} />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
