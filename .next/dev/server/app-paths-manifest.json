@@ -1,5 +1,11 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
+  "/api/dashboard/budget-comparison/route": "app/api/dashboard/budget-comparison/route.js",
+  "/api/dashboard/deadlines/route": "app/api/dashboard/deadlines/route.js",
+  "/api/dashboard/distribution/route": "app/api/dashboard/distribution/route.js",
+  "/api/dashboard/last-received/route": "app/api/dashboard/last-received/route.js",
+  "/api/dashboard/metrics/route": "app/api/dashboard/metrics/route.js",
+  "/api/dashboard/projects/route": "app/api/dashboard/projects/route.js",
+  "/api/dashboard/revenue/route": "app/api/dashboard/revenue/route.js",
   "/billing/page": "app/billing/page.js",
   "/page": "app/page.js",
   "/projects/page": "app/projects/page.js",

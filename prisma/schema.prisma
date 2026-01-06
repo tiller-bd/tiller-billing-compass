@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+model Client {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique @db.VarChar(150)
+  contactPerson String?   @map("contact_person") @db.VarChar(150)
+  contactEmail  String?   @map("contact_email") @db.VarChar(150)
+  contactPhone  String?   @map("contact_phone") @db.VarChar(50)
+  projects      Project[]
+
+  @@map("clients")
+}
+
+model Department {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?
+  projects    Project[]
+
+  @@map("departments")
+}
+
+model ProjectCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?
+  projects    Project[]
+
+  @@map("project_categories")
+}
+
+model Project {
+  id                Int             @id @default(autoincrement())
+  projectName       String          @map("project_name") @db.VarChar(200)
+  clientId          Int             @map("client_id")
+  departmentId      Int             @map("department_id")
+  categoryId        Int             @map("category_id")
+  startDate         DateTime?       @map("start_date") @db.Date
+  endDate           DateTime?       @map("end_date") @db.Date
+  totalProjectValue Decimal?        @map("total_project_value") @db.Decimal(15, 2)
+  client            Client          @relation(fields: [clientId], references: [id])
+  department        Department      @relation(fields: [departmentId], references: [id])
+  category          ProjectCategory @relation(fields: [categoryId], references: [id])
+  bills             ProjectBill[]
+
+  @@map("projects")
+}
+
+model ProjectBill {
+  id                   Int       @id @default(autoincrement())
+  projectId            Int       @map("project_id")
+  slNo                 String?   @map("sl_no") @db.VarChar(20)
+  billName             String?   @map("bill_name") @db.VarChar(200)
+  billPercent          Decimal?  @map("bill_percent") @db.Decimal(5, 2)
+  billAmount           Decimal   @map("bill_amount") @db.Decimal(15, 2)
+  tentativeBillingDate DateTime? @map("tentative_billing_date") @db.Date
+  receivedPercent      Decimal?  @map("received_percent") @db.Decimal(5, 2)
+  receivedAmount       Decimal?  @default(0) @map("received_amount") @db.Decimal(15, 2)
+  receivedDate         DateTime? @map("received_date") @db.Date
+  remainingAmount      Decimal?  @map("remaining_amount") @db.Decimal(15, 2)
+  vat                  Decimal?  @db.Decimal(15, 2)
+  it                   Decimal?  @db.Decimal(15, 2)
+  status               String?   @db.VarChar(50)
+  createdAt            DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  project              Project   @relation(fields: [projectId], references: [id])
+
+  @@map("project_bills")
+}

@@ -20,7 +20,8 @@ export function Header({ title }: HeaderProps) {
 
         <div className="flex items-center gap-4">
           {/* Search */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block ">
+            <div className='absolute inset-0 bg-gray-500 bg-opacity-30 rounded-lg'></div>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search projects..."
@@ -29,10 +30,10 @@ export function Header({ title }: HeaderProps) {
           </div>
 
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
+          {/* <Button variant="ghost" size="icon" className="relative">
             <Bell className="w-5 h-5 text-muted-foreground" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-          </Button>
+          </Button> */}
 
           {/* User Info & Logout */}
           <div className="flex items-center gap-3">

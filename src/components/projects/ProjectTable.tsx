@@ -235,7 +235,7 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
                     <div>
                       <p className="font-medium text-foreground">{project.name}</p>
                       <div className="flex gap-1 mt-1">
-                        {project.types.map((type) => (
+                        {project?.types?.map((type) => (
                           <span
                             key={type}
                             className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground"

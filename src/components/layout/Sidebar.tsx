@@ -52,12 +52,12 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
           initial={false}
           animate={{ opacity: 1 }}
         >
-          <div className="w-10 h-10 rounded-lg bg-none flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-none flex items-center justify-center ">
             {/* <Building2 className="w-6 h-6 text-primary-foreground" /> */}
             <Image width="150" height="150" src={tillerLogo} alt="Tiller Logo" className='bg-sidebar '/>
             
           </div>
-          <AnimatePresence>
+          <AnimatePresence >
             {!collapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
@@ -65,8 +65,9 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <h1 className="font-bold text-lg text-sidebar-foreground">Tiller</h1>
-                <p className="text-xs text-muted-foreground">Project Tracker</p>
+                <h1 className="font-bold text-lg text-sidebar-foreground">Tiller Bill Mgt.</h1>
+              
+                <p className="text-xs text-muted-foreground">Bill Tracker</p>
               </motion.div>
             )}
           </AnimatePresence>

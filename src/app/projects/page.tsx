@@ -220,7 +220,7 @@ export default function Projects() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProjects.map((project, index) => {
+              {filteredProjects?.map((project, index) => {
                 const status = getProjectStatus(project);
                 const received = project.bills
                   .filter(b => b.status === 'PAID')
@@ -308,7 +308,7 @@ export default function Projects() {
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
-                  {clients.map(c => (
+                  {clients?.map(c => (
                     <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
