@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, ReactNode, createContext, useContext } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -12,9 +14,7 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function useSidebarContext() {
   const context = useContext(SidebarContext);
-  if (!context) {
-    throw new Error('useSidebarContext must be used within DashboardLayout');
-  }
+  if (!context) throw new Error('useSidebarContext must be used within DashboardLayout');
   return context;
 }
 
@@ -39,9 +39,7 @@ export function DashboardLayout({ children, title, currentPath, onNavigate }: Da
           className="min-h-screen"
         >
           <Header title={title} />
-          <div className="p-6">
-            {children}
-          </div>
+          <div className="p-6">{children}</div>
         </motion.main>
       </div>
     </SidebarContext.Provider>

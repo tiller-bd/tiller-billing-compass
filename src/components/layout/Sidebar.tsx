@@ -1,9 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  FolderKanban, 
-  Users, 
-  Receipt, 
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Users,
+  Receipt,
   PlusCircle,
   ChevronLeft,
   ChevronRight,
@@ -12,6 +12,9 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useSidebarContext } from './DashboardLayout';
+import tillerLogo from '@/assets/images/tiller.jpeg';
+import Image from 'next/image';
+
 
 interface NavItem {
   icon: React.ElementType;
@@ -44,13 +47,15 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
-        <motion.div 
+        <motion.div
           className="flex items-center gap-3"
           initial={false}
           animate={{ opacity: 1 }}
         >
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-lg bg-none flex items-center justify-center">
+            {/* <Building2 className="w-6 h-6 text-primary-foreground" /> */}
+            <Image width="150" height="150" src={tillerLogo} alt="Tiller Logo" className='bg-sidebar '/>
+            
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -124,7 +129,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
               exit={{ opacity: 0 }}
               className="space-y-2"
             >
-              <Button 
+              <Button
                 onClick={() => onNavigate('/projects')}
                 className="w-full justify-start gap-2"
                 size="sm"
@@ -132,7 +137,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
                 <PlusCircle className="w-4 h-4" />
                 Add Project
               </Button>
-              <Button 
+              <Button
                 onClick={() => onNavigate('/billing')}
                 variant="outline"
                 className="w-full justify-start gap-2"
