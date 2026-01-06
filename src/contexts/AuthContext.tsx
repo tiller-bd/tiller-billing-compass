@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { mockUsers } from '@/data/mockData';
+import { validateLogin } from '@/data/api';
+import { usersData } from '@/data/users';
 import { User } from '@/types';
 
 const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
@@ -10,17 +11,10 @@ interface AuthContextType {
   isLocked: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  unlock: (password: string) => Promise<{ success: boolean; error?: string }>;
+  unlock: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock passwords for demo (in real app, this would be validated against a backend)
-const mockPasswords: Record<string, string> = {
-  'ceo@tiller.com.bd': 'admin123',
-  'pm@tiller.com.bd': 'user123',
-  'finance@tiller.com.bd': 'user123',
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -67,27 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isLocked, lastActivity]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Find user by email
-    const foundUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const result = await validateLogin(email, password);
     
-    if (!foundUser) {
-      return { success: false, error: 'User not found' };
+    if (!result.success || !result.user) {
+      return { success: false, error: result.error };
     }
 
-    if (foundUser.suspended) {
-      return { success: false, error: 'Account is suspended. Contact administrator.' };
-    }
-
-    // Check password
-    const correctPassword = mockPasswords[foundUser.email];
-    if (password !== correctPassword) {
-      return { success: false, error: 'Invalid password' };
-    }
-
-    setUser(foundUser);
+    setUser(result.user);
     setIsLocked(false);
     setLastActivity(Date.now());
-    localStorage.setItem('auth_user', JSON.stringify(foundUser));
+    localStorage.setItem('auth_user', JSON.stringify(result.user));
     
     return { success: true };
   };
@@ -98,19 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_user');
   };
 
-  const unlock = async (password: string): Promise<{ success: boolean; error?: string }> => {
-    if (!user) {
-      return { success: false, error: 'No user session' };
-    }
-
-    const correctPassword = mockPasswords[user.email];
-    if (password !== correctPassword) {
-      return { success: false, error: 'Invalid password' };
-    }
-
+  const unlock = () => {
     setIsLocked(false);
     setLastActivity(Date.now());
-    return { success: true };
   };
 
   return (

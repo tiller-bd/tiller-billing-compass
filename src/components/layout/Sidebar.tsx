@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useSidebarContext } from './DashboardLayout';
 
 interface NavItem {
   icon: React.ElementType;
@@ -33,7 +33,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebarContext();
 
   return (
     <motion.aside
@@ -125,7 +125,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
               className="space-y-2"
             >
               <Button 
-                onClick={() => onNavigate('/projects/new')}
+                onClick={() => onNavigate('/projects')}
                 className="w-full justify-start gap-2"
                 size="sm"
               >
@@ -133,7 +133,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
                 Add Project
               </Button>
               <Button 
-                onClick={() => onNavigate('/billing/new')}
+                onClick={() => onNavigate('/billing')}
                 variant="outline"
                 className="w-full justify-start gap-2"
                 size="sm"
@@ -149,7 +149,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
               exit={{ opacity: 0 }}
               className="flex flex-col gap-2"
             >
-              <Button size="icon" className="w-full" onClick={() => onNavigate('/projects/new')}>
+              <Button size="icon" className="w-full" onClick={() => onNavigate('/projects')}>
                 <PlusCircle className="w-4 h-4" />
               </Button>
             </motion.div>
