@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal, User as UserIcon } from 'lucide-react';
+import { Search, UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal, User as UserIcon } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -20,20 +21,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockUsers } from '@/data/mockData';
+import { fetchUsers, createUser } from '@/data/api';
+import { User, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Users() {
   const [currentPath, setCurrentPath] = useState('/users');
   const [searchQuery, setSearchQuery] = useState('');
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: 'USER' as UserRole,
+  });
+
   const isSuperAdmin = currentUser?.role === 'SUPERADMIN';
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    const usersData = await fetchUsers();
+    setUsers(usersData);
+  };
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -93,6 +126,40 @@ export default function Users() {
     navigate(path);
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.email) {
+      toast({
+        title: 'Error',
+        description: 'Please fill all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    const newUser = await createUser({
+      name: formData.name,
+      email: formData.email,
+      role: formData.role,
+      suspended: false,
+    });
+
+    if (newUser) {
+      toast({
+        title: 'User Created',
+        description: 'New user has been added successfully',
+      });
+      setIsDialogOpen(false);
+      setFormData({ name: '', email: '', role: 'USER' });
+      loadUsers();
+    }
+    
+    setLoading(false);
+  };
+
   return (
     <DashboardLayout
       title="Users"
@@ -109,7 +176,7 @@ export default function Users() {
             </p>
           </div>
           {isSuperAdmin && (
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
               <UserPlus className="w-4 h-4" />
               Add User
             </Button>
@@ -265,6 +332,60 @@ export default function Users() {
           )}
         </motion.div>
       </div>
+
+      {/* Add User Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                placeholder="Enter user name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                placeholder="Enter email address"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select 
+                value={formData.role} 
+                onValueChange={(value: UserRole) => setFormData({ ...formData, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USER">User</SelectItem>
+                  <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, Calendar, DollarSign, Building2 } from 'lucide-react';
+import { Plus, Search, Calendar, DollarSign, Building2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -20,75 +21,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
+import { fetchProjects, fetchClients, fetchDepartments, fetchCategories, createProject } from '@/data/api';
+import { Project, ProjectStatus, ProjectCategory } from '@/types';
+import { Client, Department, Category } from '@/data';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data matching the schema structure
-const mockProjectsData = [
-  {
-    id: 1,
-    project_name: 'E-Government Portal',
-    client: { id: 1, name: 'Ministry of ICT' },
-    department: { id: 1, name: 'Software Development' },
-    category: { id: 1, name: 'Web Application' },
-    start_date: '2024-06-15',
-    end_date: '2025-02-01',
-    total_project_value: 15000000,
-    bills_summary: { received: 5250000, pending: 9750000 },
-  },
-  {
-    id: 2,
-    project_name: 'Smart City Infrastructure',
-    client: { id: 2, name: 'Dhaka North City Corp' },
-    department: { id: 2, name: 'Planning & Development' },
-    category: { id: 2, name: 'Infrastructure' },
-    start_date: '2024-03-20',
-    end_date: '2025-04-01',
-    total_project_value: 25000000,
-    bills_summary: { received: 11250000, pending: 13750000 },
-  },
-  {
-    id: 3,
-    project_name: 'Export Management System',
-    client: { id: 3, name: 'Bangladesh Trade Corp' },
-    department: { id: 1, name: 'Software Development' },
-    category: { id: 1, name: 'Web Application' },
-    start_date: '2023-09-01',
-    end_date: '2024-05-01',
-    total_project_value: 8500000,
-    bills_summary: { received: 8500000, pending: 0 },
-  },
-  {
-    id: 4,
-    project_name: 'Digital Banking Platform',
-    client: { id: 4, name: 'First National Bank' },
-    department: { id: 1, name: 'Software Development' },
-    category: { id: 3, name: 'Mobile Application' },
-    start_date: '2025-02-01',
-    end_date: '2026-03-01',
-    total_project_value: 35000000,
-    bills_summary: { received: 0, pending: 35000000 },
-  },
-  {
-    id: 5,
-    project_name: 'Agricultural Data System',
-    client: { id: 5, name: 'FAO Bangladesh' },
-    department: { id: 1, name: 'Software Development' },
-    category: { id: 1, name: 'Web Application' },
-    start_date: '2024-08-10',
-    end_date: '2025-06-01',
-    total_project_value: 12000000,
-    bills_summary: { received: 1800000, pending: 10200000 },
-  },
-];
-
-const getProjectStatus = (project: typeof mockProjectsData[0]) => {
+const getProjectStatus = (project: Project): ProjectStatus => {
   const now = new Date();
-  const start = new Date(project.start_date);
-  const end = new Date(project.end_date);
+  const start = new Date(project.signDate);
   
   if (now < start) return 'FUTURE';
-  if (now > end || project.bills_summary.pending === 0) return 'COMPLETED';
+  if (project.status === 'COMPLETED') return 'COMPLETED';
   return 'ONGOING';
 };
 
@@ -105,8 +56,41 @@ export default function Projects() {
   const [currentPath, setCurrentPath] = useState('/projects');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    clientName: '',
+    totalBudget: '',
+    signDate: '',
+    category: 'SOFTWARE_DEV' as ProjectCategory,
+    status: 'ONGOING' as ProjectStatus,
+  });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    const [projectsData, clientsData, depsData, catsData] = await Promise.all([
+      fetchProjects(),
+      fetchClients(),
+      fetchDepartments(),
+      fetchCategories(),
+    ]);
+    setProjects(projectsData);
+    setClients(clientsData);
+    setDepartments(depsData);
+    setCategories(catsData);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-BD', {
@@ -117,18 +101,54 @@ export default function Projects() {
     }).format(amount);
   };
 
-  const filteredProjects = mockProjectsData.filter(project => {
-    const matchesSearch = project.project_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.client.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.clientName.toLowerCase().includes(searchQuery.toLowerCase());
     const status = getProjectStatus(project);
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
-    const matchesDepartment = departmentFilter === 'all' || project.department.id.toString() === departmentFilter;
-    return matchesSearch && matchesStatus && matchesDepartment;
+    return matchesSearch && matchesStatus;
   });
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
     navigate(path);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.clientName || !formData.totalBudget || !formData.signDate) {
+      toast({
+        title: 'Error',
+        description: 'Please fill all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    const newProject = await createProject({
+      name: formData.name,
+      clientName: formData.clientName,
+      totalBudget: parseFloat(formData.totalBudget),
+      signDate: new Date(formData.signDate),
+      category: formData.category,
+      status: formData.status,
+      types: ['DOMESTIC'],
+    });
+
+    if (newProject) {
+      toast({
+        title: 'Project Created',
+        description: 'New project has been added successfully',
+      });
+      setIsDialogOpen(false);
+      setFormData({ name: '', clientName: '', totalBudget: '', signDate: '', category: 'SOFTWARE_DEV', status: 'ONGOING' });
+      loadData();
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -144,7 +164,7 @@ export default function Projects() {
             <h1 className="text-2xl font-bold text-foreground">Projects</h1>
             <p className="text-muted-foreground">Manage and track all projects</p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
             <Plus className="w-4 h-4" />
             Add Project
           </Button>
@@ -177,16 +197,6 @@ export default function Projects() {
                 <SelectItem value="FUTURE">Future</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="1">Software Development</SelectItem>
-                <SelectItem value="2">Planning & Development</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </motion.div>
 
@@ -202,8 +212,7 @@ export default function Projects() {
               <TableRow>
                 <TableHead>Project</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Timeline</TableHead>
+                <TableHead>Sign Date</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead>Status</TableHead>
@@ -212,7 +221,10 @@ export default function Projects() {
             <TableBody>
               {filteredProjects.map((project, index) => {
                 const status = getProjectStatus(project);
-                const progress = (project.bills_summary.received / project.total_project_value) * 100;
+                const received = project.bills
+                  .filter(b => b.status === 'PAID')
+                  .reduce((sum, b) => sum + b.amount, 0);
+                const progress = (received / project.totalBudget) * 100;
                 
                 return (
                   <motion.tr
@@ -228,23 +240,22 @@ export default function Projects() {
                           <Building2 className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium">{project.project_name}</p>
-                          <p className="text-xs text-muted-foreground">{project.category.name}</p>
+                          <p className="font-medium">{project.name}</p>
+                          <p className="text-xs text-muted-foreground">{project.category.replace('_', ' ')}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{project.client.name}</TableCell>
-                    <TableCell>{project.department.name}</TableCell>
+                    <TableCell>{project.clientName}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
-                        <span>{new Date(project.start_date).toLocaleDateString()}</span>
+                        <span>{new Date(project.signDate).toLocaleDateString()}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">{formatCurrency(project.total_project_value)}</span>
+                        <span className="font-medium">{formatCurrency(project.totalBudget)}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -269,6 +280,103 @@ export default function Projects() {
           )}
         </motion.div>
       </div>
+
+      {/* Add Project Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Project</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Project Name *</Label>
+              <Input
+                placeholder="Enter project name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Client *</Label>
+              <Select 
+                value={formData.clientName} 
+                onValueChange={(value) => setFormData({ ...formData, clientName: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Total Budget (BDT) *</Label>
+              <Input
+                type="number"
+                placeholder="Enter total budget"
+                value={formData.totalBudget}
+                onChange={(e) => setFormData({ ...formData, totalBudget: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sign Date *</Label>
+              <Input
+                type="date"
+                value={formData.signDate}
+                onChange={(e) => setFormData({ ...formData, signDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(value: ProjectCategory) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOFTWARE_DEV">Software Development</SelectItem>
+                  <SelectItem value="PLANNING_DEV">Planning & Development</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value: ProjectStatus) => setFormData({ ...formData, status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FUTURE">Future</SelectItem>
+                  <SelectItem value="ONGOING">Ongoing</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? 'Creating...' : 'Create Project'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
