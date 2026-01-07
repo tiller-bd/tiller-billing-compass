@@ -8,7 +8,8 @@ export type ProjectCategory = 'SOFTWARE_DEV' | 'PLANNING_DEV';
 
 export type ProjectType = 'FOREIGN' | 'DOMESTIC' | 'GOVERNMENT';
 
-export type BillStatus = 'PENDING' | 'PAID' | 'OVERDUE';
+// Updated to include PARTIAL status from database triggers
+export type BillStatus = 'PENDING' | 'PAID' | 'PARTIAL' | 'OVERDUE';
 
 export interface User {
   id: string;
@@ -45,9 +46,13 @@ export interface Phase {
 export interface Bill {
   id: string;
   projectId: string;
-  phaseId: string;
-  amount: number;
-  dueDate: Date;
+  phaseId?: string; // Made optional as some bills might not link to a specific phase
+  amount: number; // Corresponds to bill_amount
+  receivedAmount?: number; // Added: received_amount
+  remainingAmount?: number; // Added: remaining_amount
+  vat?: number; // Added: vat
+  it?: number; // Added: it
+  dueDate: Date; // Corresponds to tentative_billing_date
   receivedDate?: Date;
   status: BillStatus;
   createdAt: Date;

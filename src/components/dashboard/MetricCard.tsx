@@ -1,41 +1,51 @@
+"use client";
+
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface MetricCardProps {
   title: string;
   value: string;
-  subtitle?: string;
   icon: LucideIcon;
-  trend?: {
-    value: number;
-    isPositive: boolean;
-  };
-  delay?: number;
+  loading?: boolean;
   variant?: 'default' | 'primary' | 'success' | 'warning';
 }
 
 export function MetricCard({ 
   title, 
   value, 
-  subtitle, 
   icon: Icon, 
-  trend,
-  delay = 0,
+  loading = false,
   variant = 'default'
 }: MetricCardProps) {
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-6 glow-effect h-[128px]">
+        <div className="flex items-start justify-between">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-32" />
+          </div>
+          <Skeleton className="h-12 w-12 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay }}
-      className="glass-card rounded-xl p-6 glow-effect"
+      transition={{ duration: 0.5 }}
+      className="glass-card rounded-xl p-6 glow-effect h-[128px]"
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground font-medium">{title}</p>
           <p className={cn(
-            "text-3xl font-bold tracking-tight",
+            "text-2xl font-bold tracking-tight",
             variant === 'primary' && "stat-value",
             variant === 'success' && "text-success",
             variant === 'warning' && "text-warning",
@@ -43,18 +53,6 @@ export function MetricCard({
           )}>
             {value}
           </p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          )}
-          {trend && (
-            <div className={cn(
-              "flex items-center gap-1 text-xs font-medium",
-              trend.isPositive ? "text-success" : "text-destructive"
-            )}>
-              <span>{trend.isPositive ? '↑' : '↓'}</span>
-              <span>{Math.abs(trend.value)}% from last month</span>
-            </div>
-          )}
         </div>
         <div className={cn(
           "w-12 h-12 rounded-lg flex items-center justify-center",

@@ -367,19 +367,27 @@ var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
 ;
 ;
 async function GET() {
-    const projects = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].project.findMany({
-        include: {
-            bills: true
-        }
-    });
-    const totalBudget = projects.reduce((sum, p)=>sum + Number(p.totalProjectValue || 0), 0);
-    const totalReceived = projects.flatMap((p)=>p.bills).reduce((sum, b)=>sum + Number(b.receivedAmount || 0), 0);
-    return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-        totalBudget,
-        totalReceived,
-        totalRemaining: totalBudget - totalReceived,
-        projectCount: projects.length
-    });
+    try {
+        const projects = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].project.findMany({
+            include: {
+                bills: true
+            }
+        });
+        const totalBudget = projects.reduce((sum, p)=>sum + Number(p.totalProjectValue || 0), 0);
+        const totalReceived = projects.flatMap((p)=>p.bills).reduce((sum, b)=>sum + Number(b.receivedAmount || 0), 0);
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            totalBudget,
+            totalReceived,
+            totalRemaining: totalBudget - totalReceived,
+            activeCount: projects.length // Ensure this isn't filtering out your data
+        });
+    } catch (error) {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Failed'
+        }, {
+            status: 500
+        });
+    }
 }
 __turbopack_async_result__();
 } catch(e) { __turbopack_async_result__(e); } }, false);}),

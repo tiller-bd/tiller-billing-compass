@@ -7,7 +7,9 @@ import {
   PlusCircle,
   ChevronLeft,
   ChevronRight,
-  Building2
+  Building2,
+  Briefcase,
+  ReceiptText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,15 +21,16 @@ import Image from 'next/image';
 interface NavItem {
   icon: React.ElementType;
   label: string;
-  href: string;
+  path: string;
   adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: FolderKanban, label: 'Projects', href: '/projects' },
-  { icon: Receipt, label: 'Billing', href: '/billing' },
-  { icon: Users, label: 'Users', href: '/users', adminOnly: true },
+const navItems = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Projects', path: '/projects', icon: Briefcase },
+  { name: 'Billing', path: '/billing', icon: ReceiptText },
+  { name: 'Clients', path: '/clients', icon: Building2 }, // Updated Client Link
+  { name: 'Users', path: '/users', icon: Users },
 ];
 
 interface SidebarProps {
@@ -54,8 +57,8 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
         >
           <div className="w-10 h-10 rounded-lg bg-none flex items-center justify-center ">
             {/* <Building2 className="w-6 h-6 text-primary-foreground" /> */}
-            <Image width="150" height="150" src={tillerLogo} alt="Tiller Logo" className='bg-sidebar '/>
-            
+            <Image width="150" height="150" src={tillerLogo} alt="Tiller Logo" className='bg-sidebar ' />
+
           </div>
           <AnimatePresence >
             {!collapsed && (
@@ -66,7 +69,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
                 transition={{ duration: 0.2 }}
               >
                 <h1 className="font-bold text-lg text-sidebar-foreground">Tiller Bill Mgt.</h1>
-              
+
                 <p className="text-xs text-muted-foreground">Bill Tracker</p>
               </motion.div>
             )}
@@ -77,11 +80,11 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-2">
         {navItems.map((item) => {
-          const isActive = currentPath === item.href;
+          const isActive = currentPath === item.path;
           return (
             <motion.button
-              key={item.href}
-              onClick={() => onNavigate(item.href)}
+              key={item.path}
+              onClick={() => onNavigate(item.path)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200",
                 "hover:bg-sidebar-accent group relative",
@@ -111,7 +114,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
                       isActive ? "text-sidebar-foreground" : "text-muted-foreground group-hover:text-sidebar-foreground"
                     )}
                   >
-                    {item.label}
+                    {item.name}
                   </motion.span>
                 )}
               </AnimatePresence>

@@ -368,36 +368,36 @@ var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
 ;
 async function GET(request) {
     const { searchParams } = new URL(request.url);
-    const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
+    const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
     const bills = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].projectBill.findMany({
         where: {
             receivedDate: {
                 gte: new Date(`${year}-01-01`),
                 lte: new Date(`${year}-12-31`)
             },
-            status: 'PAID'
+            status: "PAID"
         }
     });
     const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
     ];
     const data = months.map((month, index)=>{
         const amount = bills.filter((b)=>b.receivedDate && new Date(b.receivedDate).getMonth() === index).reduce((sum, b)=>sum + Number(b.receivedAmount || 0), 0);
         return {
             month,
-            received: amount / 1000000
-        }; // In Millions
+            received: amount
+        };
     });
     return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data);
 }

@@ -1,25 +1,29 @@
+"use client";
+
 import { motion } from 'framer-motion';
 import { Calendar, AlertCircle } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Deadline {
   projectName: string;
   amount: number;
-  dueDate: Date;
+  dueDate: Date | string;
 }
 
 interface UpcomingDeadlinesProps {
   deadlines: Deadline[];
+  loading?: boolean;
+  isExpanded?: boolean;
 }
 
-export function UpcomingDeadlines({ deadlines }: UpcomingDeadlinesProps) {
+export function UpcomingDeadlines({ deadlines, loading, isExpanded }: UpcomingDeadlinesProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-BD', {
       style: 'currency',
       currency: 'BDT',
-      notation: 'compact',
-      maximumFractionDigits: 1,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -27,8 +31,8 @@ export function UpcomingDeadlines({ deadlines }: UpcomingDeadlinesProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.4 }}
-      className="glass-card rounded-xl p-6"
+      transition={{ duration: 0.5 }}
+      className={cn("glass-card rounded-xl p-6", isExpanded ? "h-full" : "h-[350px]")}
     >
       <div className="flex items-center gap-2 mb-4">
         <Calendar className="w-5 h-5 text-primary" />
@@ -36,7 +40,9 @@ export function UpcomingDeadlines({ deadlines }: UpcomingDeadlinesProps) {
       </div>
       
       <div className="space-y-3">
-        {deadlines.length === 0 ? (
+        {loading ? (
+          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
+        ) : deadlines.length === 0 ? (
           <p className="text-sm text-muted-foreground">No upcoming deadlines</p>
         ) : (
           deadlines.map((deadline, index) => {
@@ -44,41 +50,27 @@ export function UpcomingDeadlines({ deadlines }: UpcomingDeadlinesProps) {
             const isUrgent = daysUntil <= 7;
 
             return (
-              <motion.div
+              <div
                 key={index}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border transition-colors",
-                  isUrgent 
-                    ? "border-warning/50 bg-warning/5" 
-                    : "border-border bg-secondary/50"
+                  "flex items-center justify-between p-3 rounded-lg border",
+                  isUrgent ? "border-warning/50 bg-warning/5" : "border-border bg-secondary/50"
                 )}
               >
                 <div className="flex items-center gap-3">
-                  {isUrgent && (
-                    <AlertCircle className="w-4 h-4 text-warning" />
-                  )}
+                  {isUrgent && <AlertCircle className="w-4 h-4 text-warning" />}
                   <div>
                     <p className="text-sm font-medium text-foreground">{deadline.projectName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(deadline.dueDate), 'MMM dd, yyyy')}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{format(new Date(deadline.dueDate), 'MMM dd, yyyy')}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-foreground">
-                    {formatCurrency(deadline.amount)}
-                  </p>
-                  <p className={cn(
-                    "text-xs",
-                    isUrgent ? "text-warning" : "text-muted-foreground"
-                  )}>
-                    {daysUntil} days
+                  <p className="text-sm font-semibold text-foreground">{formatCurrency(deadline.amount)}</p>
+                  <p className={cn("text-xs", isUrgent ? "text-warning" : "text-muted-foreground")}>
+                    {daysUntil < 0 ? 'Overdue' : `${daysUntil} days left`}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             );
           })
         )}
