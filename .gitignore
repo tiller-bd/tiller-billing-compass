@@ -1,3 +1,8 @@
+# Next.js build output
+.next/
+out/
+build/
+
 # Logs
 logs
 *.log
@@ -11,7 +16,8 @@ node_modules
 dist
 dist-ssr
 *.local
-
+# Production dependencies
+node_modules/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -24,3 +30,10 @@ dist-ssr
 *.sw?
 
 /generated/prisma
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env*
