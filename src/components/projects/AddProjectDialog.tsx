@@ -1,8 +1,9 @@
+// src/components/projects/AddProjectDialog.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { Plus, Trash2, Loader2, Building2, AlertTriangle, CheckCircle2, Calendar } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,12 +13,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => void }) {
-  const [open, setOpen] = useState(false);
+interface AddProjectDialogProps {
+  onProjectAdded: () => void;
+  open?: boolean;
+  setOpen?: (open: boolean) => void;
+}
+
+export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen: controlledSetOpen }: AddProjectDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lookups, setLookups] = useState({ clients: [], categories: [], departments: [] });
   const [isNewClient, setIsNewClient] = useState(false);
   const [ignoreTotalCheck, setIgnoreTotalCheck] = useState(false);
+
+  // Use controlled state if provided, otherwise fallback to local state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledSetOpen !== undefined ? controlledSetOpen : setInternalOpen;
 
   const { register, control, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
@@ -35,12 +46,10 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
     }
   });
 
-  const { fields, append, remove, insert } = useFieldArray({ control, name: "bills" });
-  
+  const { fields, remove, insert } = useFieldArray({ control, name: "bills" });
+
   const watchedBills = watch("bills");
   const totalValue = parseFloat(watch("totalProjectValue") || "0");
-
-  // --- Dynamic Calculations ---
 
   const totalPercentage = useMemo(() => {
     return watchedBills.reduce((sum, bill) => sum + parseFloat(bill.billPercent || "0"), 0);
@@ -48,27 +57,19 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
 
   const isPercentValid = ignoreTotalCheck || Math.abs(totalPercentage - 100) < 0.01;
 
-  // Sync Percent -> Amount (Validating 0-100 range)
   const handlePercentChange = (index: number, value: string) => {
     let pct = parseFloat(value || "0");
-    
     if (pct > 100) {
       pct = 100;
       setValue(`bills.${index}.billPercent`, "100");
       toast.warning("Percentage cannot exceed 100%");
     }
-    if (pct < 0) {
-      pct = 0;
-      setValue(`bills.${index}.billPercent`, "0");
-    }
-
     if (totalValue > 0) {
       const amount = (pct / 100) * totalValue;
       setValue(`bills.${index}.billAmount`, Math.round(amount).toString());
     }
   };
 
-  // Sync Amount -> Percent
   const handleAmountChange = (index: number, value: string) => {
     const amt = parseFloat(value || "0");
     if (totalValue > 0) {
@@ -78,7 +79,6 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
     }
   };
 
-  // Recalculate everything when Total Budget changes
   const handleTotalValueChange = (val: string) => {
     const total = parseFloat(val || "0");
     watchedBills.forEach((bill, i) => {
@@ -91,10 +91,10 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
     const deliverableCount = watchedBills.filter(b => b.billName.includes("Deliverable")).length;
     const finalIndex = watchedBills.findIndex(b => b.billName.toLowerCase().includes("final"));
     const indexToInsert = finalIndex !== -1 ? finalIndex : watchedBills.length;
-    
-    insert(indexToInsert, { 
-      billName: `Deliverable-${deliverableCount + 1}`, 
-      billPercent: "0", 
+
+    insert(indexToInsert, {
+      billName: `Deliverable-${deliverableCount + 1}`,
+      billPercent: "0",
       billAmount: "0",
       tentativeBillingDate: ""
     });
@@ -150,9 +150,8 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
             <CheckCircle2 className="w-6 h-6 text-primary" /> Project Authorization
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 mt-6">
-          {/* Main Info */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Project Identity</Label>
@@ -160,23 +159,22 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Total Project Valuation (BDT)</Label>
-              <Input 
-                type="number" 
-                {...register("totalProjectValue")} 
-                placeholder="0" 
-                className="h-11 font-black text-primary text-lg bg-primary/5" 
-                required 
+              <Input
+                type="number"
+                {...register("totalProjectValue")}
+                placeholder="0"
+                className="h-11 font-black text-primary text-lg bg-primary/5"
+                required
                 onChange={(e) => handleTotalValueChange(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Lookups */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Client Entity</Label>
               <Select onValueChange={(v) => {
-                if(v === "new") setIsNewClient(true);
+                if (v === "new") setIsNewClient(true);
                 else { setIsNewClient(false); setValue("clientId", v); }
               }}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Select Client" /></SelectTrigger>
@@ -222,16 +220,15 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
             </div>
           )}
 
-          {/* Billing Phases */}
           <div className="space-y-6 border-t pt-8">
             <div className="flex justify-between items-end">
               <div className="space-y-1">
                 <Label className="text-xl font-black uppercase tracking-tight">Financial Milestones</Label>
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="ignoreTotal" 
-                    checked={ignoreTotalCheck} 
-                    onCheckedChange={(checked) => setIgnoreTotalCheck(!!checked)} 
+                  <Checkbox
+                    id="ignoreTotal"
+                    checked={ignoreTotalCheck}
+                    onCheckedChange={(checked) => setIgnoreTotalCheck(!!checked)}
                   />
                   <label htmlFor="ignoreTotal" className="text-[10px] font-black text-muted-foreground cursor-pointer uppercase">
                     Bypass 100% Guardrail
@@ -242,7 +239,7 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
                 <Plus className="w-4 h-4 mr-2" /> Add Deliverable
               </Button>
             </div>
-            
+
             <div className="space-y-3">
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-3 items-end bg-secondary/10 p-4 rounded-xl border border-border/50 group hover:border-primary/20 transition-all">
@@ -250,13 +247,13 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
                     <Label className="text-[9px] font-black uppercase text-muted-foreground">Milestone Description</Label>
                     <Input {...register(`bills.${index}.billName`)} placeholder="Phase Name" required />
                   </div>
-                  
+
                   <div className="col-span-4 md:col-span-2 space-y-1">
                     <Label className="text-[9px] font-black uppercase text-muted-foreground">Value (%)</Label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       step="0.01"
-                      {...register(`bills.${index}.billPercent`)} 
+                      {...register(`bills.${index}.billPercent`)}
                       className="font-black text-primary"
                       onChange={(e) => handlePercentChange(index, e.target.value)}
                     />
@@ -269,11 +266,11 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
 
                   <div className="col-span-4 md:col-span-3 space-y-1">
                     <Label className="text-[9px] font-black uppercase text-muted-foreground">Amount (BDT)</Label>
-                    <Input 
-                      type="number" 
-                      {...register(`bills.${index}.billAmount`)} 
+                    <Input
+                      type="number"
+                      {...register(`bills.${index}.billAmount`)}
                       className="font-bold"
-                      required 
+                      required
                       onChange={(e) => handleAmountChange(index, e.target.value)}
                     />
                   </div>
@@ -287,7 +284,6 @@ export function AddProjectDialog({ onProjectAdded }: { onProjectAdded: () => voi
               ))}
             </div>
 
-            {/* Validation Bar */}
             <div className={cn(
               "flex items-center justify-between p-4 rounded-xl border-2 transition-all",
               isPercentValid ? "bg-success/5 border-success/20 text-success" : "bg-warning/5 border-warning/20 text-warning"

@@ -88,10 +88,19 @@ export function Sidebar() {
 
       <div className="p-3 border-t border-sidebar-border space-y-2">
         {!collapsed && (
-            <div className="flex flex-col gap-2 mb-4">
-                <Link href="/projects"><Button size="sm" className="w-full justify-start gap-2"><PlusCircle className="w-4 h-4"/> Add Project</Button></Link>
-                <Link href="/billing"><Button size="sm" variant="outline" className="w-full justify-start gap-2"><Receipt className="w-4 h-4"/> Add Bill</Button></Link>
-            </div>
+          <div className="flex flex-col gap-2 mb-4">
+            <Link href="/projects?new=true">
+              <Button size="sm" className="w-full justify-start gap-2">
+                <PlusCircle className="w-4 h-4" /> Add Project
+              </Button>
+            </Link>
+            {/* Points to Billing with ?new=true to open AddBillDialog */}
+            <Link href="/billing?new=true">
+              <Button size="sm" variant="outline" className="w-full justify-start gap-2">
+                <Receipt className="w-4 h-4" /> Add Bill
+              </Button>
+            </Link>
+          </div>
         )}
         <Button onClick={logout} variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
           <LogOut className="w-4 h-4" />

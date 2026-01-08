@@ -1,10 +1,12 @@
+// src/app/billing/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { BillingTable, BillingTableSkeleton } from '@/components/billing/BillingTable';
+import { AddBillDialog } from '@/components/billing/AddBillDialog'; // Import new dialog
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -12,15 +14,26 @@ import { cn } from '@/lib/utils';
 
 export default function BillingMasterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [bills, setBills] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Local state to control the creation dialog
+  const [isAddBillOpen, setIsAddBillOpen] = useState(false);
 
   // Filter State
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [dept, setDept] = useState('all');
   const [year, setYear] = useState('all');
+
+  // Detect ?new=true from Sidebar
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsAddBillOpen(true);
+    }
+  }, [searchParams]);
 
   const fetchBills = useCallback(async () => {
     setLoading(true);
@@ -58,12 +71,20 @@ export default function BillingMasterPage() {
             <h1 className="text-2xl font-black tracking-tight uppercase">Billing & Collections</h1>
             <p className="text-muted-foreground text-sm font-medium">Global milestone tracking and revenue realization.</p>
           </div>
-          <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full">
-            <RefreshCw className={cn(loading && "animate-spin")} size={16} />
-          </Button>
+          {/* New Button Layout: Refresh + New Bill Entry */}
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full">
+              <RefreshCw className={cn(loading && "animate-spin")} size={16} />
+            </Button>
+            <AddBillDialog 
+              open={isAddBillOpen} 
+              setOpen={setIsAddBillOpen} 
+              onBillAdded={fetchBills} 
+            />
+          </div>
         </div>
 
-        {/* Filter Bar */}
+        {/* ... (Filter Bar Section remains unchanged) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 glass-card rounded-2xl border-border/50 shadow-sm">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

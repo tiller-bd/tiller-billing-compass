@@ -1,7 +1,8 @@
+// src/app/projects/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { Search, RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProjectTable, ProjectTableSkeleton } from '@/components/projects/ProjectTable';
@@ -13,10 +14,15 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [projects, setProjects] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Local state to control the dialog visibility
+  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
 
   // Filter State
   const [search, setSearch] = useState('');
@@ -24,6 +30,13 @@ export default function ProjectsPage() {
   const [catFilter, setCatFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+
+  // Trigger dialog if URL contains ?new=true
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsAddProjectOpen(true);
+    }
+  }, [searchParams]);
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -60,7 +73,6 @@ export default function ProjectsPage() {
     return () => clearTimeout(timer);
   }, [fetchProjects]);
 
-  // Analytics Logic for Charts (Derived from filtered projects)
   const chartData = useMemo(() => {
     const realization = projects.slice(0, 10).map((p: any) => {
       const rec = p.bills.reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
@@ -91,7 +103,12 @@ export default function ProjectsPage() {
             <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading}>
               <RefreshCw className={loading ? "animate-spin" : ""} size={16} />
             </Button>
-            <AddProjectDialog onProjectAdded={fetchProjects} />
+            {/* Controlled AddProjectDialog */}
+            <AddProjectDialog 
+              open={isAddProjectOpen} 
+              setOpen={setIsAddProjectOpen} 
+              onProjectAdded={fetchProjects} 
+            />
           </div>
         </div>
 
@@ -148,7 +165,6 @@ export default function ProjectsPage() {
               onProjectClick={(project: any) => router.push(`/projects/${project.id}`)}
             />
 
-            {/* Charts Section Moved Below Table */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
               <div className="glass-card p-6 rounded-xl border border-border/50">
                 <h3 className="text-sm font-bold flex items-center gap-2 mb-6"><TrendingUp size={16}/> Onboarding Trend</h3>
