@@ -1,9 +1,10 @@
-import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+// src/app/api/clients/[id]/route.ts
+import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await verifyAuth();
@@ -18,29 +19,25 @@ export async function GET(
           include: {
             department: true,
             category: true,
-            bills: { orderBy: { tentativeBillingDate: "asc" } },
+            bills: { orderBy: { tentativeBillingDate: 'asc' } }
           },
-          orderBy: { startDate: "desc" },
-        },
-      },
+          orderBy: { startDate: 'desc' }
+        }
+      }
     });
 
-    if (!client)
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
 
-    // Calculate Client Ranking (Mock logic based on total revenue relative to others)
+    // Calculate ranking relative to other clients
     const allClients = await prisma.project.groupBy({
-      by: ["clientId"],
-      _sum: { totalProjectValue: true },
+      by: ['clientId'],
+      _sum: { totalProjectValue: true }
     });
-    const sorted = allClients.sort(
-      (a, b) =>
-        Number(b._sum.totalProjectValue) - Number(a._sum.totalProjectValue)
-    );
-    const rank = sorted.findIndex((c) => c.clientId === client.id) + 1;
+    const sorted = allClients.sort((a, b) => Number(b._sum.totalProjectValue) - Number(a._sum.totalProjectValue));
+    const rank = sorted.findIndex(c => c.clientId === client.id) + 1;
 
     return NextResponse.json({ ...client, rank });
   } catch (error) {
-    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
   }
 }

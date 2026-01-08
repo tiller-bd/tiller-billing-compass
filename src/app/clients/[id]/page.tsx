@@ -71,7 +71,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     if (loading) return <div className="p-10 space-y-6"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
     return (
-        <DashboardLayout title="Client Intelligence" currentPath="/clients" onNavigate={(p) => router.push(p)}>
+        <DashboardLayout title="Client Intelligence" >
             <div className="space-y-10 pb-20">
                 <Button variant="ghost" onClick={() => router.push('/clients')} className="gap-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft size={16} /> All Clients</Button>
 

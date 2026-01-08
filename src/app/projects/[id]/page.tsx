@@ -78,7 +78,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   if (loading) return <div className="p-10 space-y-6"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
-    <DashboardLayout title="Project Analytics" currentPath="/projects" onNavigate={(path) => router.push(path)}>
+    <DashboardLayout title="Project Analytics" >
       <div className="space-y-10 pb-20">
 
         {/* 1. Header Row */}

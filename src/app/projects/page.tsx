@@ -83,7 +83,7 @@ export default function ProjectsPage() {
   }, [projects]);
 
   return (
-    <DashboardLayout title="Projects" currentPath="/projects" onNavigate={(path) => router.push(path)}>
+    <DashboardLayout title="Projects" >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Project Management</h1>

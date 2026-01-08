@@ -114,7 +114,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardLayout title="Dashboard" currentPath="/" onNavigate={(path) => router.push(path)}>
+    <DashboardLayout title="Dashboard" >
 
       {/* Expanded View Modal */}
       {expandedCard && (

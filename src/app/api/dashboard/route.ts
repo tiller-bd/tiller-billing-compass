@@ -1,7 +1,13 @@
+// src/app/api/dashboard/route.ts
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 
 export async function GET() {
+  // Verify that the user is authenticated
+  const session = await verifyAuth();
+  if (session instanceof NextResponse) return session;
+
   try {
     const projects = await prisma.project.findMany({
       include: {
@@ -20,7 +26,7 @@ export async function GET() {
     const totalRemaining = totalBudget - totalReceived;
 
     const lastReceivedBill = [...allBills]
-      .filter(b => b.receivedDate && b.receivedAmount > 0)
+      .filter(b => b.receivedDate && toNum(b.receivedAmount) > 0) // FIXED: Use toNum() to compare Decimal with number
       .sort((a, b) => new Date(b.receivedDate!).getTime() - new Date(a.receivedDate!).getTime())[0];
 
     const lastReceived = lastReceivedBill ? {

@@ -39,10 +39,10 @@ export function Header({ title }: HeaderProps) {
           <div className="flex items-center gap-3">
             <Avatar className="w-8 h-8">
               <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                {user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                {user?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden md:block text-sm font-medium">{user?.name || 'User'}</span>
+            <span className="hidden md:block text-sm font-medium">{user?.full_name || 'User'}</span>
             <Button variant="ghost" size="sm" onClick={logout}>
               Logout
             </Button>

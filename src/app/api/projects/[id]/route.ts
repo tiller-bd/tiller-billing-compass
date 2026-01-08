@@ -1,16 +1,17 @@
+// src/app/api/projects/[id]/route.ts
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> } // Change to Promise
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await verifyAuth();
   if (session instanceof NextResponse) return session;
 
   try {
-    const { id } = await params; // Await params
+    const { id } = await params;
     const project = await prisma.project.findUnique({
       where: { id: parseInt(id) },
       include: {

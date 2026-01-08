@@ -51,7 +51,7 @@ export default function BillingMasterPage() {
   }, [fetchBills]);
 
   return (
-    <DashboardLayout title="Billing" currentPath="/billing" onNavigate={(p) => router.push(p)}>
+    <DashboardLayout title="Billing" >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

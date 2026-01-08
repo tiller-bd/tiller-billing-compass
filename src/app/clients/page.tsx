@@ -40,7 +40,7 @@ export default function ClientsPage() {
   const formatCurrency = (v: number) => `৳${(v / 1000000).toFixed(2)}M`;
 
   return (
-    <DashboardLayout title="Client Registry" currentPath="/clients" onNavigate={(p) => router.push(p)}>
+    <DashboardLayout title="Client Registry" >
       <div className="space-y-8">
         
         {/* Comparative Charts */}

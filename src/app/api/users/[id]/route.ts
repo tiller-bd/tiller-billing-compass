@@ -1,31 +1,56 @@
 // src/app/api/users/[id]/route.ts
-
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
+import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
+import bcrypt from 'bcryptjs';
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await verifyAuth();
   if (session instanceof NextResponse) return session;
 
-  const data = await req.json();
-  const user = await prisma.user.update({
-    where: { id: parseInt(params.id) },
-    data,
-  });
-  return NextResponse.json(user);
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    
+    const updateData: any = { ...body };
+    
+    // Support for resetting passwords by Super Admin
+    if (body.password) {
+      updateData.password_hash = await bcrypt.hash(body.password, 10);
+      delete updateData.password;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: updateData
+    });
+    
+    const { password_hash, ...safeUser } = user;
+    return NextResponse.json(safeUser);
+  } catch (error) {
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+  }
 }
 
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await verifyAuth();
   if (session instanceof NextResponse) return session;
 
-  await prisma.user.delete({ where: { id: parseInt(params.id) } });
-  return NextResponse.json({ success: true });
+  try {
+    const { id } = await params;
+    
+    await prisma.user.delete({ 
+      where: { id: parseInt(id) } 
+    });
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Deletion failed' }, { status: 500 });
+  }
 }
