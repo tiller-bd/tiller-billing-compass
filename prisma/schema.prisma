@@ -1,10 +1,27 @@
+// tiller-bd/tiller-billing-compass/tiller-bd-tiller-billing-compass-9dc0c96ae35c772e4b41e094abc073b19dc877c7/prisma/schema.prisma
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
+
 datasource db {
   provider = "postgresql"
+  // Note: The 'url' property is removed here because it is defined in prisma.config.ts
 }
+
+model User {
+  id            Int      @id @default(autoincrement())
+  full_name     String?
+  email         String   @unique
+  password_hash String
+  role          String?  @default("user")
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("users")
+}
+
 model Client {
   id            Int       @id @default(autoincrement())
   name          String    @unique @db.VarChar(150)

@@ -1,10 +1,11 @@
+// src/contexts/AuthContext.tsx
+
 "use client";
-
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { validateLogin } from '@/data/api';
 import { User } from '@/types';
+import { useRouter } from 'next/navigation';
 
-const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
+const IDLE_TIMEOUT = 2 * 60 * 1000;
 
 interface AuthContextType {
   user: User | null;
@@ -18,6 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('auth_user');
@@ -25,65 +27,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return null;
   });
-  
+
   const [isLocked, setIsLocked] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
 
   const handleActivity = useCallback(() => {
-    if (!isLocked) {
-      setLastActivity(Date.now());
-    }
+    if (!isLocked) setLastActivity(Date.now());
   }, [isLocked]);
 
   useEffect(() => {
     if (!user) return;
-    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => window.addEventListener(event, handleActivity));
-    return () => events.forEach(event => window.removeEventListener(event, handleActivity));
-  }, [user, handleActivity]);
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'click'];
+    events.forEach(e => window.addEventListener(e, handleActivity));
 
-  useEffect(() => {
-    if (!user || isLocked) return;
     const checkIdle = setInterval(() => {
-      if (Date.now() - lastActivity > IDLE_TIMEOUT) {
-        setIsLocked(true);
-      }
+      if (Date.now() - lastActivity > IDLE_TIMEOUT) setIsLocked(true);
     }, 1000);
-    return () => clearInterval(checkIdle);
-  }, [user, isLocked, lastActivity]);
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handleActivity));
+      clearInterval(checkIdle);
+    };
+  }, [user, handleActivity, lastActivity]);
 
   const login = async (email: string, password: string) => {
-    const result = await validateLogin(email, password);
-    if (result.success && result.user) {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    const result = await res.json();
+    if (result.success) {
       setUser(result.user);
-      setIsLocked(false);
-      setLastActivity(Date.now());
       localStorage.setItem('auth_user', JSON.stringify(result.user));
       return { success: true };
     }
     return { success: false, error: result.error };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Clear cookie on server via a simple utility route or just client-side expiration
+    document.cookie = "auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     setUser(null);
-    setIsLocked(false);
     localStorage.removeItem('auth_user');
+    router.push('/login');
   };
-
-  const unlock = () => {
-    setIsLocked(false);
-    setLastActivity(Date.now());
-  };
-
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLocked, login, logout, unlock }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLocked, login, logout, unlock: () => setIsLocked(false) }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
-}
+};

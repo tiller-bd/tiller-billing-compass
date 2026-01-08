@@ -1,10 +1,14 @@
-import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { verifyAuth } from "@/lib/auth";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await verifyAuth();
+  if (session instanceof NextResponse) return session;
+
   try {
     const { id } = await params;
     const client = await prisma.client.findUnique({
@@ -14,25 +18,29 @@ export async function GET(
           include: {
             department: true,
             category: true,
-            bills: { orderBy: { tentativeBillingDate: 'asc' } }
+            bills: { orderBy: { tentativeBillingDate: "asc" } },
           },
-          orderBy: { startDate: 'desc' }
-        }
-      }
+          orderBy: { startDate: "desc" },
+        },
+      },
     });
 
-    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    if (!client)
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
     // Calculate Client Ranking (Mock logic based on total revenue relative to others)
     const allClients = await prisma.project.groupBy({
-      by: ['clientId'],
-      _sum: { totalProjectValue: true }
+      by: ["clientId"],
+      _sum: { totalProjectValue: true },
     });
-    const sorted = allClients.sort((a, b) => Number(b._sum.totalProjectValue) - Number(a._sum.totalProjectValue));
-    const rank = sorted.findIndex(c => c.clientId === client.id) + 1;
+    const sorted = allClients.sort(
+      (a, b) =>
+        Number(b._sum.totalProjectValue) - Number(a._sum.totalProjectValue)
+    );
+    const rank = sorted.findIndex((c) => c.clientId === client.id) + 1;
 
     return NextResponse.json({ ...client, rank });
   } catch (error) {
-    return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }

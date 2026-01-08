@@ -1,25 +1,37 @@
-import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { verifyAuth } from "@/lib/auth";
 
 export async function GET(request: Request) {
+  const session = await verifyAuth();
+  if (session instanceof NextResponse) return session;
+
   try {
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status');
-    const departmentId = searchParams.get('departmentId');
-    const year = searchParams.get('year');
+    const search = searchParams.get("search") || "";
+    const status = searchParams.get("status");
+    const departmentId = searchParams.get("departmentId");
+    const year = searchParams.get("year");
 
     const where: any = {
       OR: [
-        { billName: { contains: search, mode: 'insensitive' } },
-        { project: { projectName: { contains: search, mode: 'insensitive' } } },
-        { project: { client: { name: { contains: search, mode: 'insensitive' } } } },
+        { billName: { contains: search, mode: "insensitive" } },
+        { project: { projectName: { contains: search, mode: "insensitive" } } },
+        {
+          project: {
+            client: { name: { contains: search, mode: "insensitive" } },
+          },
+        },
       ],
     };
 
-    if (status && status !== 'all') where.status = status;
-    if (departmentId && departmentId !== 'all') where.project = { ...where.project, departmentId: parseInt(departmentId) };
-    if (year && year !== 'all') {
+    if (status && status !== "all") where.status = status;
+    if (departmentId && departmentId !== "all")
+      where.project = {
+        ...where.project,
+        departmentId: parseInt(departmentId),
+      };
+    if (year && year !== "all") {
       where.tentativeBillingDate = {
         gte: new Date(`${year}-01-01`),
         lte: new Date(`${year}-12-31`),
@@ -32,15 +44,18 @@ export async function GET(request: Request) {
         project: {
           include: {
             client: true,
-            department: true
-          }
-        }
+            department: true,
+          },
+        },
       },
-      orderBy: { tentativeBillingDate: 'asc' }
+      orderBy: { tentativeBillingDate: "asc" },
     });
 
     return NextResponse.json(bills);
   } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

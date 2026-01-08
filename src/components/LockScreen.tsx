@@ -1,92 +1,38 @@
-import { useState, useEffect } from 'react';
+// src/components/LockScreen.tsx
+"use client";
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 
-export function LockScreen() {
-  const { user, unlock, logout } = useAuth();
-
-  // Blob animation values
-  const [blobPositions, setBlobPositions] = useState([
-    { x: 20, y: 30 },
-    { x: 70, y: 60 },
-    { x: 40, y: 80 },
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBlobPositions([
-        { x: Math.random() * 60 + 10, y: Math.random() * 60 + 10 },
-        { x: Math.random() * 60 + 20, y: Math.random() * 60 + 20 },
-        { x: Math.random() * 60 + 15, y: Math.random() * 60 + 15 },
-      ]);
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleUnlock = () => {
-    unlock();
-  };
-
+export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
-    <div className="fixed inset-0 bg-background/95 backdrop-blur-md z-[100] flex items-center justify-center">
-      {/* Animated Blobs */}
-      {blobPositions.map((pos, i) => (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="w-full h-full bg-background/80 backdrop-blur-2xl flex flex-col items-center justify-center cursor-pointer"
+      onClick={onUnlock}
+    >
+      <div className="relative">
+        {/* Blob Animation */}
         <motion.div
-          key={i}
-          className="absolute rounded-full blur-3xl pointer-events-none"
-          style={{
-            background: `hsl(var(--primary) / ${0.15 - i * 0.03})`,
-            width: `${200 + i * 100}px`,
-            height: `${200 + i * 100}px`,
-          }}
           animate={{
-            x: `${pos.x}vw`,
-            y: `${pos.y}vh`,
+            scale: [1, 1.2, 1],
+            rotate: [0, 90, 0],
+            borderRadius: ["40%", "50%", "40%"]
           }}
-          transition={{
-            duration: 8 + i * 2,
-            ease: 'easeInOut',
-            repeat: Infinity,
-            repeatType: 'reverse',
-          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 bg-primary/20 blur-3xl w-64 h-64 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2"
         />
-      ))}
-
-      {/* Lock Dialog */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative z-10 w-full max-w-sm mx-4"
-      >
-        <div className="glass-card rounded-2xl p-8 text-center">
-          <motion.div
-            animate={{ rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-            className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center"
-          >
-            <Lock className="w-8 h-8 text-primary" />
-          </motion.div>
-
-          <h2 className="text-xl font-bold text-foreground mb-1">Session Locked</h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Welcome back, {user?.name}. Click to continue.
-          </p>
-
-          <Button onClick={handleUnlock} className="w-full" size="lg">
-            Click to Unlock
-          </Button>
-
-          <button
-            onClick={logout}
-            className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Sign out and switch account
-          </button>
+        
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
+            <Lock className="w-8 h-8 text-primary animate-pulse" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold">Session Locked</h2>
+            <p className="text-muted-foreground mt-2">Click anywhere to unlock and resume</p>
+          </div>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }

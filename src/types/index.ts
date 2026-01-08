@@ -1,6 +1,6 @@
 // Project tracking types for Tiller Consultancy
 
-export type UserRole = 'SUPERADMIN' | 'USER';
+export type UserRole = 'USER' | 'SUPERADMIN';
 
 export type ProjectStatus = 'FUTURE' | 'ONGOING' | 'COMPLETED';
 
@@ -11,14 +11,26 @@ export type ProjectType = 'FOREIGN' | 'DOMESTIC' | 'GOVERNMENT';
 // Updated to include PARTIAL status from database triggers
 export type BillStatus = 'PENDING' | 'PAID' | 'PARTIAL' | 'OVERDUE';
 
+// export interface User {
+//   id: string;
+//   name: string;
+//   email: string;
+//   role: UserRole;
+//   suspended: boolean;
+//   createdAt: Date;
+// }
+
+
+
 export interface User {
-  id: string;
-  name: string;
+  id: number;
+  full_name: string | null;
   email: string;
   role: UserRole;
-  suspended: boolean;
-  createdAt: Date;
+  is_active: boolean;
+  created_at: string;
 }
+
 
 export interface Project {
   id: string;
