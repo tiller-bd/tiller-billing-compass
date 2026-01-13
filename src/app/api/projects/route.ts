@@ -7,12 +7,14 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
-    const categoryId = searchParams.get("categoryId"); // New filter
+    const categoryId = searchParams.get("categoryId");
     const year = searchParams.get("year");
     const status = searchParams.get("status");
+    const clientId = searchParams.get("clientId");
+    const projectId = searchParams.get("projectId");
 
     const where: any = {
       OR: [
@@ -24,7 +26,11 @@ export async function GET(request: NextRequest) {
     if (departmentId && departmentId !== "all")
       where.departmentId = parseInt(departmentId);
     if (categoryId && categoryId !== "all")
-      where.categoryId = parseInt(categoryId); // Added logic
+      where.categoryId = parseInt(categoryId);
+    if (clientId && clientId !== "all")
+      where.clientId = parseInt(clientId);
+    if (projectId && projectId !== "all")
+      where.id = parseInt(projectId);
 
     if (year && year !== "all") {
       where.startDate = {

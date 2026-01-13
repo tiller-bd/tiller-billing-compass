@@ -7,11 +7,13 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status");
     const departmentId = searchParams.get("departmentId");
     const year = searchParams.get("year");
+    const clientId = searchParams.get("clientId");
+    const projectId = searchParams.get("projectId");
 
     const where: any = {
       OR: [
@@ -30,6 +32,16 @@ export async function GET(request: NextRequest) {
       where.project = {
         ...where.project,
         departmentId: parseInt(departmentId),
+      };
+    if (clientId && clientId !== "all")
+      where.project = {
+        ...where.project,
+        clientId: parseInt(clientId),
+      };
+    if (projectId && projectId !== "all")
+      where.project = {
+        ...where.project,
+        id: parseInt(projectId),
       };
     if (year && year !== "all") {
       where.tentativeBillingDate = {

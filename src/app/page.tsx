@@ -14,6 +14,8 @@ import { ProjectTable } from '@/components/projects/ProjectTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { useSharedFilters } from '@/contexts/FilterContext';
+import { DashboardFilter } from '@/components/dashboard/DashboardFilter';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<any>(null);
@@ -23,8 +25,10 @@ export default function DashboardPage() {
   const [lastReceived, setLastReceived] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  const { debouncedSearch, departmentId, clientId, projectId } = useSharedFilters();
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
   // Individual Loading States for Refetching
   const [loadingStates, setLoadingStates] = useState({
@@ -43,56 +47,70 @@ export default function DashboardPage() {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
   };
 
+  const getFilterQueryParams = () => {
+    const params = new URLSearchParams();
+    if (departmentId !== 'all') params.append('departmentId', departmentId);
+    if (clientId !== 'all') params.append('clientId', clientId);
+    if (projectId !== 'all') params.append('projectId', projectId);
+    return params.toString();
+  };
+
   // Specialized Fetchers
   const fetchMetrics = useCallback(async () => {
     updateLoading('metrics', true);
-    const res = await fetch('/api/dashboard/metrics');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/metrics?${params}`);
     setMetrics(await res.json());
     updateLoading('metrics', false);
-  }, []);
+  }, [departmentId, clientId, projectId]);
 
   const fetchRevenue = useCallback(async (year: string) => {
     updateLoading('revenue', true);
-    const res = await fetch(`/api/dashboard/revenue?year=${year}`);
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/revenue?year=${year}&${params}`);
     setRevenue(await res.json());
     updateLoading('revenue', false);
-  }, []);
+  }, [selectedYear, departmentId, clientId, projectId]);
 
   const fetchDistribution = useCallback(async () => {
     updateLoading('distribution', true);
-    const res = await fetch('/api/dashboard/distribution');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/distribution?${params}`);
     setDistribution(await res.json());
     updateLoading('distribution', false);
-  }, []);
+  }, [departmentId, clientId, projectId]);
 
   const fetchBudgetComparison = useCallback(async () => {
     updateLoading('budget', true);
-    const res = await fetch('/api/dashboard/budget-comparison');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/budget-comparison?${params}`);
     setBudgetComparison(await res.json());
     updateLoading('budget', false);
-  }, []);
+  }, [departmentId, clientId, projectId]);
 
   const fetchLastReceived = useCallback(async () => {
     updateLoading('lastReceived', true);
-    const res = await fetch('/api/dashboard/last-received');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/last-received?${params}`);
     setLastReceived(await res.json());
     updateLoading('lastReceived', false);
-  }, []);
+  }, [departmentId, clientId, projectId]);
 
   const fetchDeadlines = useCallback(async () => {
     updateLoading('deadlines', true);
-    const res = await fetch('/api/dashboard/deadlines');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/deadlines?${params}`);
     setDeadlines(await res.json());
     updateLoading('deadlines', false);
-  }, []);
+  }, [departmentId, clientId, projectId]);
 
   const fetchProjects = useCallback(async () => {
     updateLoading('projects', true);
-    const res = await fetch('/api/dashboard/projects');
+    const params = getFilterQueryParams();
+    const res = await fetch(`/api/dashboard/projects?${params}`);
     setProjects(await res.json());
     updateLoading('projects', false);
-  }, []);
-
+  }, [departmentId, clientId, projectId]);
 
 
   useEffect(() => {
@@ -103,7 +121,7 @@ export default function DashboardPage() {
     fetchLastReceived();
     fetchDeadlines();
     fetchProjects();
-  }, [selectedYear, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchProjects]);
+  }, [selectedYear, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-BD', {
@@ -133,6 +151,7 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-6">
+        <DashboardFilter />
         {/* Top Metric Cards - Refetch Only */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative group">

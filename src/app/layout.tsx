@@ -7,6 +7,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SharedFilterProvider } from "@/contexts/FilterContext"; // Import SharedFilterProvider
 import { useState } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -23,11 +24,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <TooltipProvider>
-              {children}
-              <Toaster />
-              <Sonner />
-            </TooltipProvider>
+            <SharedFilterProvider> {/* Wrap with SharedFilterProvider */}
+              <TooltipProvider>
+                {children}
+                <Toaster />
+                <Sonner />
+              </TooltipProvider>
+            </SharedFilterProvider>
           </AuthProvider>
         </QueryClientProvider>
       </body>
