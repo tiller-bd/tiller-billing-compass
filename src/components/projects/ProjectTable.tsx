@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import IndexCounter from '@/components/dashboard/IndexCounter';
 
 interface ProjectTableProps {
   projects: any[];
@@ -38,7 +39,7 @@ export function ProjectTableSkeleton() {
               <th className="p-4 text-left">Project Info</th>
               <th className="p-4 text-left">Client</th>
               <th className="p-4 text-left">Sign Date</th>
-              <th className="p-4 text-center">Budget Realization</th>
+              <th className="p-4 text-center">Budget Received</th>
               <th className="p-4 text-left">Recovery</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
@@ -138,14 +139,14 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
               <th className="p-4">Project Info</th>
               {visibleColumns.client && <th className="p-4">Client</th>}
               {visibleColumns.date && <th className="p-4">Sign Date</th>}
-              <th className="p-4 text-center">Budget Realization</th>
+              <th className="p-4 text-center">Budget Received</th>
               {visibleColumns.progress && <th className="p-4">Recovery</th>}
               {visibleColumns.status && <th className="p-4">Status</th>}
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {projects.map((p: any) => {
+            {projects.map((p: any, index: number) => {
               const total = Number(p.totalProjectValue || 0);
               const rec = p.bills?.filter((b: any) => b.status === 'PAID')
                 .reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
@@ -154,12 +155,13 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
               const dept = getDeptBadge(p.department?.name);
 
               return (
-                <tr 
-                  key={p.id} 
-                  className="border-b border-border/50 hover:bg-muted/10 transition-colors cursor-pointer group"
+                <tr
+                  key={p.id}
+                  className="border-b border-border/50 hover:bg-muted/10 transition-colors cursor-pointer group relative"
                   onClick={() => onProjectClick?.(p)}
                 >
-                  <td className="p-4">
+                  <td className="p-4 relative">
+                    <IndexCounter index={index} position="start" />
                     <p className="font-bold text-foreground group-hover:text-primary transition-colors">{p.projectName}</p>
                     <div className="flex gap-1.5 mt-1.5">
                       <Badge variant="outline" className={cn("text-[9px] h-4 px-1.5 font-bold border", dept.color)}>

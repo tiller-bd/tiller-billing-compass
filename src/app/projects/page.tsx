@@ -2,30 +2,33 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
-import { Search, RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProjectTable, ProjectTableSkeleton } from '@/components/projects/ProjectTable';
 import { AddProjectDialog } from '@/components/projects/AddProjectDialog';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
+import { ErrorDisplay } from '@/components/error/ErrorDisplay';
+import { ApiClientError, apiFetch } from '@/lib/api-client';
+import { useSharedFilters } from '@/contexts/FilterContext';
 
 export default function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  const [projects, setProjects] = useState([]);
+  const { debouncedSearch } = useSharedFilters();
+
+  const [projects, setProjects] = useState<any[]>([]);
   const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [error, setError] = useState<ApiClientError | null>(null);
+
   // Local state to control the dialog visibility
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
 
-  // Filter State
-  const [search, setSearch] = useState('');
+  // Filter State (search comes from header via shared context)
   const [deptFilter, setDeptFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -40,32 +43,35 @@ export default function ProjectsPage() {
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
+      if (debouncedSearch) params.append('search', debouncedSearch);
       if (deptFilter !== 'all') params.append('departmentId', deptFilter);
       if (catFilter !== 'all') params.append('categoryId', catFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (yearFilter !== 'all') params.append('year', yearFilter);
 
-      const res = await fetch(`/api/projects?${params.toString()}`);
-      const data = await res.json();
-      setProjects(data);
-    } catch (error) {
-      console.error("Error:", error);
+      const data = await apiFetch(`/api/projects?${params.toString()}`);
+      setProjects(data as any[]);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        setError(err);
+      }
+      console.error("Error:", err);
     } finally {
       setLoading(false);
     }
-  }, [search, deptFilter, catFilter, statusFilter, yearFilter]);
+  }, [debouncedSearch, deptFilter, catFilter, statusFilter, yearFilter]);
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/departments').then(res => res.json()),
-      fetch('/api/categories').then(res => res.json())
+      apiFetch('/api/departments'),
+      apiFetch('/api/categories')
     ]).then(([depts, cats]) => {
-      setDepartments(depts);
-      setCategories(cats);
-    });
+      setDepartments(depts as any);
+      setCategories(cats as any);
+    }).catch(err => console.error("Failed to fetch filters:", err));
   }, []);
 
   useEffect(() => {
@@ -74,7 +80,7 @@ export default function ProjectsPage() {
   }, [fetchProjects]);
 
   const chartData = useMemo(() => {
-    const realization = projects.slice(0, 10).map((p: any) => {
+    const received = projects.slice(0, 10).map((p: any) => {
       const rec = p.bills.reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
       return {
         name: p.projectName.length > 12 ? p.projectName.substring(0, 10) + '..' : p.projectName,
@@ -91,7 +97,7 @@ export default function ProjectsPage() {
       return acc;
     }, []).reverse();
 
-    return { realization, trend };
+    return { received, trend };
   }, [projects]);
 
   return (
@@ -112,12 +118,8 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 glass-card rounded-xl border border-border/50">
-          <div className="relative lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-secondary/30" />
-          </div>
+        {/* Filter Bar - Search is in header */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 glass-card rounded-xl border border-border/50">
           <Select value={deptFilter} onValueChange={setDeptFilter}>
             <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Department" /></SelectTrigger>
             <SelectContent>
@@ -151,6 +153,13 @@ export default function ProjectsPage() {
 
         {loading ? (
           <ProjectTableSkeleton />
+        ) : error ? (
+          <ErrorDisplay
+            error={error}
+            code={error.code}
+            message={error.message}
+            onRetry={fetchProjects}
+          />
         ) : (
           <>
             <ProjectTable
@@ -160,7 +169,7 @@ export default function ProjectsPage() {
                 clientName: p.client?.name || 'Unknown',
                 signDate: p.startDate,
                 totalBudget: Number(p.totalProjectValue),
-                status: p.bills.every((b: any) => b.status === 'PAID') ? 'COMPLETED' : 'ONGOING'
+                status: p.bills?.every((b: any) => b.status === 'PAID') ? 'COMPLETED' : 'ONGOING'
               }))}
               onProjectClick={(project: any) => router.push(`/projects/${project.id}`)}
             />
@@ -182,10 +191,10 @@ export default function ProjectsPage() {
               </div>
 
               <div className="glass-card p-6 rounded-xl border border-border/50">
-                <h3 className="text-sm font-bold flex items-center gap-2 mb-6"><BarChart3 size={16}/> Budget Realization (Actual Amounts)</h3>
+                <h3 className="text-sm font-bold flex items-center gap-2 mb-6"><BarChart3 size={16}/> Budget Received (Actual Amounts)</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.realization} layout="vertical">
+                    <BarChart data={chartData.received} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                       <XAxis type="number" fontSize={10} tickFormatter={(v) => `৳${v.toLocaleString()}`} />
                       <YAxis dataKey="name" type="category" fontSize={10} width={80} />

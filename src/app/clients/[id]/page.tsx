@@ -49,8 +49,8 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                     <span className="text-3xl font-black text-primary mx-2">{formatCurrency(totalVal)}</span>.
                 </p>
                 <p className="text-xl md:text-2xl">
-                    We have achieved a collection realization of <span className="text-success font-black">{((totalRec / totalVal) * 100).toFixed(1)}%</span>,
-                    translating to <span className="font-bold text-success">{formatCurrency(totalRec)}</span> in realized revenue. The remaining dues of
+                    We have achieved a collection received of <span className="text-success font-black">{((totalRec / totalVal) * 100).toFixed(1)}%</span>,
+                    translating to <span className="font-bold text-success">{formatCurrency(totalRec)}</span> in received revenue. The remaining dues of
                     <span className="text-destructive font-black mx-1">{formatCurrency(totalVal - totalRec)}</span> are strategically distributed across active milestones.
                 </p>
             </div>

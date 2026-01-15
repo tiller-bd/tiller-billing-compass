@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
+import { handlePrismaError, apiError } from "@/lib/api-error";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -50,10 +51,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(transformed);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch clients" },
-      { status: 500 }
-    );
+    console.error("Clients fetch error:", error);
+    return handlePrismaError(error);
   }
 }
 
@@ -64,16 +63,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, contactPerson, contactEmail, contactPhone } = body;
 
-    if (!name) {
-      return NextResponse.json(
-        { error: "Company name is required" },
-        { status: 400 }
-      );
+    if (!name || !name.trim()) {
+      return apiError("Company name is required", "VALIDATION_ERROR");
     }
 
     const client = await prisma.client.create({
       data: {
-        name,
+        name: name.trim(),
         contactPerson,
         contactEmail,
         contactPhone,
@@ -81,16 +77,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(client, { status: 201 });
-  } catch (error: any) {
-    if (error.code === "P2002") {
-      return NextResponse.json(
-        { error: "A client with this name already exists" },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("Client create error:", error);
+    return handlePrismaError(error);
   }
 }

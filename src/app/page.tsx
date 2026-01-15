@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Wallet, TrendingUp, TrendingDown, FolderKanban, Maximize2, RefreshCw, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
@@ -16,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { useSharedFilters } from '@/contexts/FilterContext';
 import { DashboardFilter } from '@/components/dashboard/DashboardFilter';
+import { ApiClientError, apiFetch } from '@/lib/api-client';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<any>(null);
@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
-  const { debouncedSearch, departmentId, clientId, projectId } = useSharedFilters();
+  const { departmentId, clientId, projectId } = useSharedFilters();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
   // Individual Loading States for Refetching
@@ -41,10 +41,31 @@ export default function DashboardPage() {
     projects: true
   });
 
-  const router = useRouter();
+  // Error states for each section
+  const [errors, setErrors] = useState<{
+    metrics: ApiClientError | null;
+    revenue: ApiClientError | null;
+    distribution: ApiClientError | null;
+    budget: ApiClientError | null;
+    lastReceived: ApiClientError | null;
+    deadlines: ApiClientError | null;
+    projects: ApiClientError | null;
+  }>({
+    metrics: null,
+    revenue: null,
+    distribution: null,
+    budget: null,
+    lastReceived: null,
+    deadlines: null,
+    projects: null
+  });
 
   const updateLoading = (key: keyof typeof loadingStates, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateError = (key: keyof typeof errors, error: ApiClientError | null) => {
+    setErrors(prev => ({ ...prev, [key]: error }));
   };
 
   const getFilterQueryParams = () => {
@@ -55,61 +76,117 @@ export default function DashboardPage() {
     return params.toString();
   };
 
-  // Specialized Fetchers
+  // Specialized Fetchers with error handling
   const fetchMetrics = useCallback(async () => {
     updateLoading('metrics', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/metrics?${params}`);
-    setMetrics(await res.json());
-    updateLoading('metrics', false);
+    updateError('metrics', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/metrics?${params}`);
+      setMetrics(data);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('metrics', err);
+      }
+    } finally {
+      updateLoading('metrics', false);
+    }
   }, [departmentId, clientId, projectId]);
 
   const fetchRevenue = useCallback(async (year: string) => {
     updateLoading('revenue', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/revenue?year=${year}&${params}`);
-    setRevenue(await res.json());
-    updateLoading('revenue', false);
+    updateError('revenue', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/revenue?year=${year}&${params}`);
+      setRevenue(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('revenue', err);
+      }
+    } finally {
+      updateLoading('revenue', false);
+    }
   }, [selectedYear, departmentId, clientId, projectId]);
 
   const fetchDistribution = useCallback(async () => {
     updateLoading('distribution', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/distribution?${params}`);
-    setDistribution(await res.json());
-    updateLoading('distribution', false);
+    updateError('distribution', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/distribution?${params}`);
+      setDistribution(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('distribution', err);
+      }
+    } finally {
+      updateLoading('distribution', false);
+    }
   }, [departmentId, clientId, projectId]);
 
   const fetchBudgetComparison = useCallback(async () => {
     updateLoading('budget', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/budget-comparison?${params}`);
-    setBudgetComparison(await res.json());
-    updateLoading('budget', false);
+    updateError('budget', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/budget-comparison?${params}`);
+      setBudgetComparison(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('budget', err);
+      }
+    } finally {
+      updateLoading('budget', false);
+    }
   }, [departmentId, clientId, projectId]);
 
   const fetchLastReceived = useCallback(async () => {
     updateLoading('lastReceived', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/last-received?${params}`);
-    setLastReceived(await res.json());
-    updateLoading('lastReceived', false);
+    updateError('lastReceived', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/last-received?${params}`);
+      setLastReceived(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('lastReceived', err);
+      }
+    } finally {
+      updateLoading('lastReceived', false);
+    }
   }, [departmentId, clientId, projectId]);
 
   const fetchDeadlines = useCallback(async () => {
     updateLoading('deadlines', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/deadlines?${params}`);
-    setDeadlines(await res.json());
-    updateLoading('deadlines', false);
+    updateError('deadlines', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/deadlines?${params}`);
+      setDeadlines(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('deadlines', err);
+      }
+    } finally {
+      updateLoading('deadlines', false);
+    }
   }, [departmentId, clientId, projectId]);
 
   const fetchProjects = useCallback(async () => {
     updateLoading('projects', true);
-    const params = getFilterQueryParams();
-    const res = await fetch(`/api/dashboard/projects?${params}`);
-    setProjects(await res.json());
-    updateLoading('projects', false);
+    updateError('projects', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/projects?${params}`);
+      setProjects(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('projects', err);
+      }
+    } finally {
+      updateLoading('projects', false);
+    }
   }, [departmentId, clientId, projectId]);
 
 
@@ -150,7 +227,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="dashboard-page-content">
         <DashboardFilter />
         {/* Top Metric Cards - Refetch Only */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -215,12 +292,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="relative group">
+              <div className="relative group col-span-2">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDistribution}><RefreshCw className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('distribution')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
-                <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
+                <div className=''>
+                  <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
+                </div>
+
               </div>
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">

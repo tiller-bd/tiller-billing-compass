@@ -100,17 +100,20 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
               <th className="p-5">Milestone & Project</th>
               <th className="p-5">Schedule Lifecycle</th>
               <th className="p-5 text-center">Alloc %</th>
-              <th className="p-5">Financial Realization</th>
+              <th className="p-5">Financial Received</th>
               <th className="p-5">Status</th>
               <th className="p-5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {bills.map((bill) => {
-              const totalVal = Number(bill.project?.totalProjectValue || 0);
+              const totalProjectVal = Number(bill.project?.totalProjectValue || 0);
               const recAmt = Number(bill.receivedAmount || 0);
               const billAmt = Number(bill.billAmount || 0);
-              const recPct = totalVal > 0 ? ((recAmt / totalVal) * 100).toFixed(1) : "0";
+              const remaining = billAmt - recAmt;
+              // All percentages are relative to TOTAL PROJECT VALUE (100%)
+              const recPctOfProject = totalProjectVal > 0 ? ((recAmt / totalProjectVal) * 100).toFixed(2) : "0";
+              const remainingPctOfProject = totalProjectVal > 0 ? ((remaining / totalProjectVal) * 100).toFixed(2) : "0";
               const dept = getDeptBadge(bill.project?.department?.name);
 
               return (
@@ -144,8 +147,9 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
 
                   <td className="p-5 text-center">
                     <div className="flex flex-col items-center">
-                      <span className="font-black text-slate-400 text-[10px]">TOTAL: {bill.billPercent}%</span>
-                      {recAmt > 0 && <span className="font-black text-success text-[10px]">REAL: {recPct}%</span>}
+                      <span className="font-black text-slate-400 text-[10px]">ALLOC: {bill.billPercent}%</span>
+                      {recAmt > 0 && <span className="font-black text-success text-[10px]">RECV: {recPctOfProject}%</span>}
+                      {remaining > 0 && <span className="font-black text-destructive/70 text-[10px]">REM: {remainingPctOfProject}%</span>}
                     </div>
                   </td>
 
@@ -172,7 +176,11 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
                     <div className="flex justify-end items-center gap-2">
                       {/* Record payment only if not fully paid */}
                       {bill.status !== 'PAID' ? (
-                        <RecordPaymentDialog bill={bill} onSuccess={onRefresh} />
+                        <RecordPaymentDialog
+                          bill={bill}
+                          totalProjectValue={totalProjectVal}
+                          onSuccess={onRefresh}
+                        />
                       ) : (
                         <div className="h-8 px-3 rounded-md bg-success/5 text-success text-[10px] font-black flex items-center gap-1 border border-success/20">
                           <CheckCircle2 size={12} /> SETTLED

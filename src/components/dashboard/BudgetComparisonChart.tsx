@@ -40,12 +40,18 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" horizontal={false} />
-              <XAxis 
+              <XAxis
                 type="number"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }}
-                tickFormatter={(value) => `৳${(value / 1000).toFixed(0)}k`}
+                tickFormatter={(value) => {
+                  // Values are already in millions from the API
+                  if (value >= 1) {
+                    return `৳${value.toLocaleString('en-IN')}M`;
+                  }
+                  return `৳${(value * 1000).toLocaleString('en-IN')}K`;
+                }}
               />
               <YAxis 
                 type="category"

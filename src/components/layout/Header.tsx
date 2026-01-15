@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSharedFilters, Suggestion } from '@/contexts/FilterContext';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { usePathname } from 'next/navigation';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 
@@ -14,9 +15,10 @@ interface HeaderProps {
 
 export function Header({ title }: HeaderProps) {
   const { user, logout } = useAuth();
-  const { 
-    search, 
-    setSearch, 
+  const pathname = usePathname();
+  const {
+    search,
+    setSearch,
     debouncedSearch,
     setSelectedFilter,
     setDepartmentId,
@@ -27,6 +29,15 @@ export function Header({ title }: HeaderProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic placeholder based on current page
+  const searchPlaceholder = useMemo(() => {
+    if (pathname.startsWith('/projects')) return 'Search projects...';
+    if (pathname.startsWith('/billing')) return 'Search milestones...';
+    if (pathname.startsWith('/clients')) return 'Search clients...';
+    if (pathname.startsWith('/users')) return 'Search users...';
+    return 'Search...';
+  }, [pathname]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -89,7 +100,7 @@ export function Header({ title }: HeaderProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   ref={inputRef}
-                  placeholder="Search departments, clients, projects..."
+                  placeholder={searchPlaceholder}
                   className="w-64 pl-9 bg-secondary border-border pr-8"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

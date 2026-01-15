@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,25 +19,34 @@ interface AddProjectDialogProps {
   setOpen?: (open: boolean) => void;
 }
 
+const DRAFT_KEY = "addProjectDraft";
+
 export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen: controlledSetOpen }: AddProjectDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lookups, setLookups] = useState({ clients: [], categories: [], departments: [] });
   const [isNewClient, setIsNewClient] = useState(false);
   const [ignoreTotalCheck, setIgnoreTotalCheck] = useState(false);
+  const [amountErrors, setAmountErrors] = useState<Record<number, boolean>>({});
 
   // Use controlled state if provided, otherwise fallback to local state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = controlledSetOpen !== undefined ? controlledSetOpen : setInternalOpen;
 
-  const { register, control, handleSubmit, reset, watch, setValue } = useForm({
+  // Get current date in YYYY-MM-DD format for default value
+  const getCurrentDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const { register, control, handleSubmit, reset, watch, setValue, getValues } = useForm({
     defaultValues: {
       projectName: "",
       clientId: "",
       categoryId: "",
       departmentId: "",
       totalProjectValue: "",
-      startDate: "",
+      startDate: getCurrentDate(),
       newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
       bills: [
         { billName: "Inception", billPercent: "20", billAmount: "", tentativeBillingDate: "" },
@@ -56,6 +65,74 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   }, [watchedBills]);
 
   const isPercentValid = ignoreTotalCheck || Math.abs(totalPercentage - 100) < 0.01;
+  const percentDifference = 100 - totalPercentage;
+  const isOverAllocated = totalPercentage > 100;
+  const isUnderAllocated = totalPercentage < 100 && Math.abs(percentDifference) > 0.01;
+
+  // Load draft when dialog opens
+  useEffect(() => {
+    if (open) {
+      const draft = localStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        try {
+          const parsedDraft = JSON.parse(draft);
+          // Restore all form values including the bypass checkbox
+          Object.keys(parsedDraft).forEach((key) => {
+            if (key === 'ignoreTotalCheck') {
+              setIgnoreTotalCheck(parsedDraft[key]);
+            } else if (key === 'isNewClient') {
+              setIsNewClient(parsedDraft[key]);
+            } else {
+              setValue(key as any, parsedDraft[key]);
+            }
+          });
+          toast.info("Draft restored from previous session");
+        } catch (e) {
+          console.error("Failed to load draft:", e);
+        }
+      }
+    }
+  }, [open, setValue]);
+
+  // Auto-save draft whenever form values change
+  useEffect(() => {
+    if (open) {
+      const saveDraft = () => {
+        const formData = getValues();
+        const draftData = {
+          ...formData,
+          ignoreTotalCheck,
+          isNewClient
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      };
+
+      const timeoutId = setTimeout(saveDraft, 1000); // Debounce 1 second
+      return () => clearTimeout(timeoutId);
+    }
+  }, [watchedBills, watch("projectName"), watch("totalProjectValue"), watch("clientId"),
+    watch("categoryId"), watch("departmentId"), watch("startDate"),
+    watch("newClient"), ignoreTotalCheck, isNewClient, open, getValues]);
+
+  const validateAmount = (index: number, amount: string) => {
+    const amt = parseFloat(amount || "0");
+
+    // Check if amount is negative
+    if (amt < 0) {
+      setAmountErrors(prev => ({ ...prev, [index]: true }));
+      return false;
+    }
+
+    // Check if amount exceeds total project value
+    if (totalValue > 0 && amt > totalValue) {
+      setAmountErrors(prev => ({ ...prev, [index]: true }));
+      toast.error("Amount cannot exceed total project value");
+      return false;
+    }
+
+    setAmountErrors(prev => ({ ...prev, [index]: false }));
+    return true;
+  };
 
   const handlePercentChange = (index: number, value: string) => {
     let pct = parseFloat(value || "0");
@@ -64,26 +141,50 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       setValue(`bills.${index}.billPercent`, "100");
       toast.warning("Percentage cannot exceed 100%");
     }
+    if (pct < 0) {
+      pct = 0;
+      setValue(`bills.${index}.billPercent`, "0");
+    }
+
     if (totalValue > 0) {
       const amount = (pct / 100) * totalValue;
-      setValue(`bills.${index}.billAmount`, Math.round(amount).toString());
+      const roundedAmount = Math.round(amount).toString();
+      setValue(`bills.${index}.billAmount`, roundedAmount);
+      validateAmount(index, roundedAmount);
     }
   };
 
   const handleAmountChange = (index: number, value: string) => {
     const amt = parseFloat(value || "0");
+
+    // Don't allow negative amounts
+    if (amt < 0) {
+      setValue(`bills.${index}.billAmount`, "0");
+      setAmountErrors(prev => ({ ...prev, [index]: false }));
+      return;
+    }
+
     if (totalValue > 0) {
       const percent = (amt / totalValue) * 100;
       const roundedPercent = Math.min(100, Math.max(0, percent)).toFixed(2);
       setValue(`bills.${index}.billPercent`, roundedPercent);
     }
+
+    validateAmount(index, value);
+  };
+
+  const handleAmountBlur = (index: number) => {
+    const amount = watch(`bills.${index}.billAmount`);
+    validateAmount(index, amount);
   };
 
   const handleTotalValueChange = (val: string) => {
     const total = parseFloat(val || "0");
     watchedBills.forEach((bill, i) => {
       const amt = (parseFloat(bill.billPercent || "0") / 100) * total;
-      setValue(`bills.${i}.billAmount`, Math.round(amt).toString());
+      const roundedAmount = Math.round(amt).toString();
+      setValue(`bills.${i}.billAmount`, roundedAmount);
+      validateAmount(i, roundedAmount);
     });
   };
 
@@ -92,10 +193,14 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     const finalIndex = watchedBills.findIndex(b => b.billName.toLowerCase().includes("final"));
     const indexToInsert = finalIndex !== -1 ? finalIndex : watchedBills.length;
 
+    // Calculate default amount based on 5% of total value
+    const defaultPercent = "5";
+    const defaultAmount = totalValue > 0 ? Math.round((5 / 100) * totalValue).toString() : "0";
+
     insert(indexToInsert, {
       billName: `Deliverable-${deliverableCount + 1}`,
-      billPercent: "0",
-      billAmount: "0",
+      billPercent: defaultPercent,
+      billAmount: defaultAmount,
       tentativeBillingDate: ""
     });
   };
@@ -112,7 +217,19 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     }
   }, [open]);
 
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+  };
+
   const onSubmit = async (data: any) => {
+    // Check for amount errors
+    const hasAmountErrors = Object.values(amountErrors).some(error => error);
+    if (hasAmountErrors) {
+      toast.error("Please fix amount validation errors before submitting");
+      return;
+    }
+
+    // Validate percentage only if bypass is NOT checked
     if (!ignoreTotalCheck && Math.abs(totalPercentage - 100) > 0.01) {
       toast.error(`Invalid Allocation: Total is ${totalPercentage.toFixed(2)}%. It must be exactly 100%.`);
       return;
@@ -127,8 +244,27 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       });
       if (!res.ok) throw new Error();
       toast.success("Project Authorized: Billing milestones initialized.");
+
+      // Clear draft after successful submission
+      clearDraft();
+
       setOpen(false);
-      reset();
+      reset({
+        projectName: "",
+        clientId: "",
+        categoryId: "",
+        departmentId: "",
+        totalProjectValue: "",
+        startDate: getCurrentDate(),
+        newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
+        bills: [
+          { billName: "Inception", billPercent: "20", billAmount: "", tentativeBillingDate: "" },
+          { billName: "Final handover", billPercent: "80", billAmount: "", tentativeBillingDate: "" }
+        ]
+      });
+      setIsNewClient(false);
+      setIgnoreTotalCheck(false);
+      setAmountErrors({});
       onProjectAdded();
     } catch (err) {
       toast.error("Process Failed: Please verify all required fields.");
@@ -137,8 +273,62 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     }
   };
 
+  const handleDialogClose = (newOpen: boolean) => {
+    if (!newOpen) {
+      // Save draft when closing
+      const formData = getValues();
+      const draftData = {
+        ...formData,
+        ignoreTotalCheck,
+        isNewClient
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      toast.info("Draft saved automatically");
+    }
+    setOpen(newOpen);
+  };
+
+  // Get status color and message for budget allocation
+  const getAllocationStatus = () => {
+    if (ignoreTotalCheck) {
+      return {
+        color: "info",
+        icon: CheckCircle2,
+        message: "Budget Allocation",
+        description: "Guardrail bypassed"
+      };
+    }
+
+    if (isPercentValid) {
+      return {
+        color: "success",
+        icon: CheckCircle2,
+        message: "Perfect Allocation",
+        description: "100% allocated"
+      };
+    }
+
+    if (isOverAllocated) {
+      return {
+        color: "danger",
+        icon: AlertCircle,
+        message: "Over-Allocated",
+        description: `Exceeded by ${Math.abs(percentDifference).toFixed(2)}%`
+      };
+    }
+
+    return {
+      color: "warning",
+      icon: AlertTriangle,
+      message: "Under-Allocated",
+      description: `${percentDifference.toFixed(2)}% remaining`
+    };
+  };
+
+  const allocationStatus = getAllocationStatus();
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogTrigger asChild>
         <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all">
           <Plus className="w-4 h-4" /> Create New Project
@@ -173,10 +363,18 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Client Entity</Label>
-              <Select onValueChange={(v) => {
-                if (v === "new") setIsNewClient(true);
-                else { setIsNewClient(false); setValue("clientId", v); }
-              }}>
+              <Select
+                value={isNewClient ? "new" : watch("clientId")}
+                onValueChange={(v) => {
+                  if (v === "new") {
+                    setIsNewClient(true);
+                    setValue("clientId", "");
+                  } else {
+                    setIsNewClient(false);
+                    setValue("clientId", v);
+                  }
+                }}
+              >
                 <SelectTrigger className="h-10"><SelectValue placeholder="Select Client" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new" className="text-primary font-black">+ Create New Client</SelectItem>
@@ -187,7 +385,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Domain / Category</Label>
-              <Select onValueChange={(v) => setValue("categoryId", v)}>
+              <Select value={watch("categoryId")} onValueChange={(v) => setValue("categoryId", v)}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Category" /></SelectTrigger>
                 <SelectContent>
                   {lookups.categories.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
@@ -197,7 +395,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Division</Label>
-              <Select onValueChange={(v) => setValue("departmentId", v)}>
+              <Select value={watch("departmentId")} onValueChange={(v) => setValue("departmentId", v)}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Dept" /></SelectTrigger>
                 <SelectContent>
                   {lookups.departments.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
@@ -253,6 +451,8 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
+                      max="100"
                       {...register(`bills.${index}.billPercent`)}
                       className="font-black text-primary"
                       onChange={(e) => handlePercentChange(index, e.target.value)}
@@ -268,11 +468,21 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                     <Label className="text-[9px] font-black uppercase text-muted-foreground">Amount (BDT)</Label>
                     <Input
                       type="number"
+                      min="0"
                       {...register(`bills.${index}.billAmount`)}
-                      className="font-bold"
+                      className={cn(
+                        "font-bold",
+                        amountErrors[index] && "border-red-500 focus-visible:ring-red-500"
+                      )}
                       required
                       onChange={(e) => handleAmountChange(index, e.target.value)}
+                      onBlur={() => handleAmountBlur(index)}
                     />
+                    {amountErrors[index] && (
+                      <p className="text-[10px] text-red-500 font-bold mt-1">
+                        Amount exceeds total value
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-12 md:col-span-1 flex justify-end">
@@ -286,23 +496,42 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
             <div className={cn(
               "flex items-center justify-between p-4 rounded-xl border-2 transition-all",
-              isPercentValid ? "bg-success/5 border-success/20 text-success" : "bg-warning/5 border-warning/20 text-warning"
+              allocationStatus.color === "success" && "bg-green-500/5 border-green-500/20 text-green-600 dark:text-green-400",
+              allocationStatus.color === "warning" && "bg-yellow-500/5 border-yellow-500/20 text-yellow-600 dark:text-yellow-400",
+              allocationStatus.color === "danger" && "bg-red-500/5 border-red-500/20 text-red-600 dark:text-red-400",
+              allocationStatus.color === "info" && "bg-blue-500/5 border-blue-500/20 text-blue-600 dark:text-blue-400"
             )}>
-              <div className="flex items-center gap-3 text-sm font-black uppercase">
-                {isPercentValid ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5 animate-pulse" />}
-                Budget Allocation: {totalPercentage.toFixed(2)}%
+              <div className="flex items-center gap-3">
+                <allocationStatus.icon className="w-5 h-5" />
+                <div>
+                  <div className="text-sm font-black uppercase">{allocationStatus.message}</div>
+                  <div className="text-xs font-bold opacity-80">{totalPercentage.toFixed(2)}% • {allocationStatus.description}</div>
+                </div>
               </div>
-              {!isPercentValid && !ignoreTotalCheck && (
-                <span className="text-[10px] font-black bg-warning/20 px-3 py-1 rounded-full uppercase">
-                  Remaining: {(100 - totalPercentage).toFixed(2)}%
+              {ignoreTotalCheck && (
+                <span className="text-[10px] font-black bg-primary/20 px-3 py-1 rounded-full uppercase">
+                  Bypass Active
                 </span>
               )}
             </div>
           </div>
 
-          <Button type="submit" className="w-full h-14 text-lg font-black uppercase tracking-widest" disabled={loading}>
-            {loading ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : "Authorize Project Creation"}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 h-14 text-sm font-black uppercase"
+              onClick={() => {
+                clearDraft();
+                toast.success("Draft cleared");
+              }}
+            >
+              Clear Draft
+            </Button>
+            <Button type="submit" className="flex-1 h-14 text-lg font-black uppercase tracking-widest" disabled={loading}>
+              {loading ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : "Authorize Project Creation"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

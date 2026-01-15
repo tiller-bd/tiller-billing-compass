@@ -5,6 +5,7 @@ import { Calendar, AlertCircle } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import IndexCounter from './IndexCounter';
 
 interface Deadline {
   projectName: string;
@@ -32,13 +33,16 @@ export function UpcomingDeadlines({ deadlines, loading, isExpanded }: UpcomingDe
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className={cn("glass-card rounded-xl p-6", isExpanded ? "h-full" : "h-[350px]")}
+      className={cn(
+        "glass-card rounded-xl p-6 flex flex-col",
+        isExpanded ? "h-full" : "h-full"
+      )}
     >
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-shrink-0">
         <Calendar className="w-5 h-5 text-primary" />
         <h3 className="font-semibold text-foreground">Upcoming Deadlines</h3>
       </div>
-      
+
       <div className="space-y-3">
         {loading ? (
           [...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
@@ -53,7 +57,7 @@ export function UpcomingDeadlines({ deadlines, loading, isExpanded }: UpcomingDe
               <div
                 key={index}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border",
+                  "relative flex items-center justify-between p-3 rounded-lg border",
                   isUrgent ? "border-warning/50 bg-warning/5" : "border-border bg-secondary/50"
                 )}
               >
@@ -64,6 +68,7 @@ export function UpcomingDeadlines({ deadlines, loading, isExpanded }: UpcomingDe
                     <p className="text-xs text-muted-foreground">{format(new Date(deadline.dueDate), 'MMM dd, yyyy')}</p>
                   </div>
                 </div>
+                <IndexCounter index={index} />
                 <div className="text-right">
                   <p className="text-sm font-semibold text-foreground">{formatCurrency(deadline.amount)}</p>
                   <p className={cn("text-xs", isUrgent ? "text-warning" : "text-muted-foreground")}>

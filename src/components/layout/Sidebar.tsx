@@ -61,7 +61,10 @@ export function Sidebar() {
 
       <nav className="flex-1 py-6 px-3 space-y-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.path;
+          // For root path, require exact match. For other paths, match if pathname starts with item path
+          const isActive = item.path === '/'
+            ? pathname === '/'
+            : pathname === item.path || pathname.startsWith(`${item.path}/`);
           return (
             <Link key={item.path} href={item.path}>
               <motion.div

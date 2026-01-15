@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
+import { handlePrismaError, apiError } from "@/lib/api-error";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -23,14 +24,22 @@ export async function GET(request: NextRequest) {
       ],
     };
 
-    if (departmentId && departmentId !== "all")
-      where.departmentId = parseInt(departmentId);
-    if (categoryId && categoryId !== "all")
-      where.categoryId = parseInt(categoryId);
-    if (clientId && clientId !== "all")
-      where.clientId = parseInt(clientId);
-    if (projectId && projectId !== "all")
-      where.id = parseInt(projectId);
+    if (departmentId && departmentId !== "all") {
+      const parsed = parseInt(departmentId);
+      if (!isNaN(parsed)) where.departmentId = parsed;
+    }
+    if (categoryId && categoryId !== "all") {
+      const parsed = parseInt(categoryId);
+      if (!isNaN(parsed)) where.categoryId = parsed;
+    }
+    if (clientId && clientId !== "all") {
+      const parsed = parseInt(clientId);
+      if (!isNaN(parsed)) where.clientId = parsed;
+    }
+    if (projectId && projectId !== "all") {
+      const parsed = parseInt(projectId);
+      if (!isNaN(parsed)) where.id = parsed;
+    }
 
     if (year && year !== "all") {
       where.startDate = {
@@ -64,15 +73,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(filtered);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    console.error("Projects fetch error:", error);
+    return handlePrismaError(error);
   }
 }
 
 export async function POST(request: NextRequest) {
-  
   const session = await verifyAuth();
   if (session instanceof NextResponse) return session;
 
@@ -90,6 +96,18 @@ export async function POST(request: NextRequest) {
       bills,
     } = body;
 
+    if (!projectName || !projectName.trim()) {
+      return apiError("Project name is required", "VALIDATION_ERROR");
+    }
+
+    if (!departmentId) {
+      return apiError("Department is required", "VALIDATION_ERROR");
+    }
+
+    if (!categoryId) {
+      return apiError("Category is required", "VALIDATION_ERROR");
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       let finalClientId = clientId;
       if (!clientId && newClient) {
@@ -99,19 +117,18 @@ export async function POST(request: NextRequest) {
 
       return await tx.project.create({
         data: {
-          projectName,
+          projectName: projectName.trim(),
           clientId: parseInt(finalClientId),
           departmentId: parseInt(departmentId),
           categoryId: parseInt(categoryId),
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
-          totalProjectValue: parseFloat(totalProjectValue),
+          totalProjectValue: parseFloat(totalProjectValue) || 0,
           bills: {
-            create: bills.map((bill: any) => ({
+            create: (bills || []).map((bill: any) => ({
               billName: bill.billName,
-              billPercent: parseFloat(bill.billPercent),
-              billAmount: parseFloat(bill.billAmount),
-              // Ensure this date is captured
+              billPercent: parseFloat(bill.billPercent) || 0,
+              billAmount: parseFloat(bill.billAmount) || 0,
               tentativeBillingDate: bill.tentativeBillingDate
                 ? new Date(bill.tentativeBillingDate)
                 : null,
@@ -122,7 +139,8 @@ export async function POST(request: NextRequest) {
       });
     });
     return NextResponse.json(result, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("Project create error:", error);
+    return handlePrismaError(error);
   }
 }

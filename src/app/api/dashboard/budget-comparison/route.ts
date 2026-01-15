@@ -1,13 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
+import { handlePrismaError } from '@/lib/api-error';
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
   if (session instanceof NextResponse) return session;
 
   try {
-    const { searchParams } = request.nextUrl;
+    const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
@@ -21,13 +22,16 @@ export async function GET(request: NextRequest) {
       ];
     }
     if (departmentId && departmentId !== "all") {
-      where.departmentId = parseInt(departmentId);
+      const parsed = parseInt(departmentId);
+      if (!isNaN(parsed)) where.departmentId = parsed;
     }
     if (clientId && clientId !== "all") {
-      where.clientId = parseInt(clientId);
+      const parsed = parseInt(clientId);
+      if (!isNaN(parsed)) where.clientId = parsed;
     }
     if (projectId && projectId !== "all") {
-      where.id = parseInt(projectId);
+      const parsed = parseInt(projectId);
+      if (!isNaN(parsed)) where.id = parsed;
     }
 
     const projects = await prisma.project.findMany({
@@ -53,6 +57,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(comparison);
   } catch (error) {
     console.error('Budget Comparison API Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return handlePrismaError(error);
   }
 }

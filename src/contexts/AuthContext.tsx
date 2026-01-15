@@ -20,16 +20,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('auth_user');
-      return stored ? JSON.parse(stored) : null;
-    }
-    return null;
-  });
-
+  const [user, setUser] = useState<User | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydrate user from localStorage after mount to prevent SSR mismatch
+  useEffect(() => {
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem('auth_user');
+      }
+    }
+    setIsHydrated(true);
+  }, []);
 
   const handleActivity = useCallback(() => {
     if (!isLocked) setLastActivity(Date.now());
@@ -71,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_user');
     router.push('/login');
   };
+  // Show nothing until hydrated to prevent flicker
+  if (!isHydrated) {
+    return null;
+  }
+
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLocked, login, logout, unlock: () => setIsLocked(false) }}>
       {children}

@@ -1,14 +1,13 @@
 // src/app/users/page.tsx
-"use client"; 
+"use client";
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search, UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal, User as UserIcon } from 'lucide-react';
+import { UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { User, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useSharedFilters } from '@/contexts/FilterContext';
 
 export default function Users() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const { debouncedSearch } = useSharedFilters();
   const [users, setUsers] = useState<User[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,6 +35,12 @@ export default function Users() {
   };
 
   useEffect(() => { loadUsers(); }, []);
+
+  // Filter users based on header search
+  const filteredUsers = users.filter(u =>
+    u.full_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
 
   const handleToggleSuspend = async (user: User) => {
     if (!isSuperAdmin) return;
@@ -85,13 +91,7 @@ export default function Users() {
           )}
         </div>
 
-        <div className="glass-card p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-          </div>
-        </div>
-
+        {/* Search is in header */}
         <div className="glass-card rounded-xl overflow-hidden">
           <Table>
             <TableHeader>
@@ -104,7 +104,7 @@ export default function Users() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.filter(u => u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.includes(searchQuery)).map((user) => (
+              {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>

@@ -2,34 +2,46 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Users, PieChart as PieIcon, TrendingUp, Settings2 } from 'lucide-react';
+import { PieChart as PieIcon, TrendingUp, Settings2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ErrorDisplay } from '@/components/error/ErrorDisplay';
+import { ApiClientError, apiFetch } from '@/lib/api-client';
+import { useSharedFilters } from '@/contexts/FilterContext';
 
 export default function ClientsPage() {
   const router = useRouter();
-  const [clients, setClients] = useState([]);
+  const { debouncedSearch } = useSharedFilters();
+
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [visibleColumns, setVisibleColumns] = useState({ contact: true, projects: true, realization: true });
+  const [error, setError] = useState<ApiClientError | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState({ contact: true, projects: true, received: true });
 
   const fetchClients = async () => {
     setLoading(true);
-    const res = await fetch(`/api/clients?search=${search}`);
-    setClients(await res.json());
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await apiFetch(`/api/clients?search=${debouncedSearch}`);
+      setClients(data as any[]);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        setError(err);
+      }
+      console.error("Failed to fetch clients:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    const timer = setTimeout(fetchClients, 400);
-    return () => clearTimeout(timer);
-  }, [search]);
+    fetchClients();
+  }, [debouncedSearch]);
 
   const chartData = useMemo(() => {
     const share = clients.map(c => ({ name: c.name, value: c.totalBudget })).slice(0, 5);
@@ -76,13 +88,9 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* Registry Table */}
+        {/* Registry Table - Search is in header */}
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-             <div className="relative w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search client registry..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-secondary/30 border-none" />
-             </div>
+          <div className="flex justify-end items-center">
              <Popover>
                 <PopoverTrigger asChild><Button variant="ghost" size="sm" className="gap-2 font-bold"><Settings2 size={14}/> Column Settings</Button></PopoverTrigger>
                 <PopoverContent className="w-48">
@@ -104,12 +112,16 @@ export default function ClientsPage() {
                       {visibleColumns.contact && <th className="p-4">Primary Contact</th>}
                       {visibleColumns.projects && <th className="p-4">Active Projects</th>}
                       <th className="p-4">Financial Volume</th>
-                      {visibleColumns.realization && <th className="p-4">Realization</th>}
+                      {visibleColumns.received && <th className="p-4">Received</th>}
                    </tr>
                 </thead>
                 <tbody className="text-sm">
                    {loading ? (
-                     [...Array(5)].map((_, i) => <tr key={i}><td className="p-4"><Skeleton className="h-10 w-full" /></td></tr>)
+                     [...Array(5)].map((_, i) => <tr key={i}><td className="p-4" colSpan={5}><Skeleton className="h-10 w-full" /></td></tr>)
+                   ) : error ? (
+                     <tr><td colSpan={5}><ErrorDisplay error={error} code={error.code} message={error.message} onRetry={fetchClients} compact /></td></tr>
+                   ) : clients.length === 0 ? (
+                     <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No clients found</td></tr>
                    ) : (
                      clients.map(client => (
                        <tr key={client.id} className="border-b border-border/30 hover:bg-primary/[0.02] cursor-pointer" onClick={() => router.push(`/clients/${client.id}`)}>
@@ -120,7 +132,7 @@ export default function ClientsPage() {
                              <p className="font-bold text-xs">{formatCurrency(client.totalBudget)}</p>
                              <div className="flex gap-2 text-[10px] font-black"><span className="text-success">REC: {Math.round(client.realizationRate)}%</span></div>
                           </td>
-                          {visibleColumns.realization && (
+                          {visibleColumns.received && (
                             <td className="p-4">
                                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                                   <div className="h-full bg-success" style={{ width: `${client.realizationRate}%` }} />
