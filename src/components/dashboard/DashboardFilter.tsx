@@ -90,81 +90,83 @@ export function DashboardFilter() {
 
   if (loading) {
     return (
-      <div className="flex items-center space-x-2 text-muted-foreground">
+      <div className="flex items-center space-x-2 text-muted-foreground py-3 md:py-4">
         <RefreshCw className="h-4 w-4 animate-spin" />
-        <span>Loading filters...</span>
+        <span className="text-sm">Loading filters...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-red-500">Error loading filters: {error}</div>
+      <div className="text-red-500 text-sm py-3 md:py-4">Error loading filters: {error}</div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-4 py-4">
-      <div>
-        <Label htmlFor="department-filter" className="sr-only">Filter by Department</Label>
-        <Select 
-          value={getSelectValue('department', departmentId)} 
-          onValueChange={handleDepartmentChange}
-          disabled={isSelectDisabled('department')}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((dep) => (
-              <SelectItem key={dep.id} value={dep.id}>{dep.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="py-3 md:py-4 overflow-x-auto">
+      <div className="flex items-center gap-2 md:gap-4 min-w-max md:min-w-0 md:flex-wrap">
+        <div>
+          <Label htmlFor="department-filter" className="sr-only">Filter by Department</Label>
+          <Select
+            value={getSelectValue('department', departmentId)}
+            onValueChange={handleDepartmentChange}
+            disabled={isSelectDisabled('department')}
+          >
+            <SelectTrigger className="w-[140px] md:w-[180px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="All Departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((dep) => (
+                <SelectItem key={dep.id} value={dep.id}>{dep.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label htmlFor="client-filter" className="sr-only">Filter by Client</Label>
-        <Select 
-          value={getSelectValue('client', clientId)} 
-          onValueChange={handleClientChange}
-          disabled={isSelectDisabled('client')}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Clients" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Clients</SelectItem>
-            {clients.map((cli) => (
-              <SelectItem key={cli.id} value={cli.id}>{cli.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div>
+          <Label htmlFor="client-filter" className="sr-only">Filter by Client</Label>
+          <Select
+            value={getSelectValue('client', clientId)}
+            onValueChange={handleClientChange}
+            disabled={isSelectDisabled('client')}
+          >
+            <SelectTrigger className="w-[130px] md:w-[180px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="All Clients" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Clients</SelectItem>
+              {clients.map((cli) => (
+                <SelectItem key={cli.id} value={cli.id}>{cli.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label htmlFor="project-filter" className="sr-only">Filter by Project</Label>
-        <Select 
-          value={getSelectValue('project', projectId)} 
-          onValueChange={handleProjectChange}
-          disabled={isSelectDisabled('project')}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Projects" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Projects</SelectItem>
-            {projects.map((proj) => (
-              <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div>
+          <Label htmlFor="project-filter" className="sr-only">Filter by Project</Label>
+          <Select
+            value={getSelectValue('project', projectId)}
+            onValueChange={handleProjectChange}
+            disabled={isSelectDisabled('project')}
+          >
+            <SelectTrigger className="w-[130px] md:w-[180px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="All Projects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map((proj) => (
+                <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Button variant="outline" onClick={resetFilters}>
-        Reset Filters
-      </Button>
+        <Button variant="outline" onClick={resetFilters} className="h-9 md:h-10 text-xs md:text-sm px-3 md:px-4 shrink-0">
+          Reset
+        </Button>
+      </div>
     </div>
   );
 }

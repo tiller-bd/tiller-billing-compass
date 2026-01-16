@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Receipt, TrendingUp, Sparkles, Target, CheckCircle2, ChevronDown, ChevronUp, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Receipt, TrendingUp, Sparkles, Target, CheckCircle2, ChevronDown, ChevronUp, Settings2, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,12 +15,15 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { RecordPaymentDialog } from '@/components/billing/RecordPaymentDialog';
+import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
+import { EditBillDialog } from '@/components/billing/EditBillDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SortableHeader, useSorting } from '@/components/ui/sortable-header';
 
 export default function ProjectDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -53,16 +56,19 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
       });
   }, [id]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', maximumFractionDigits: 0 }).format(amount);
+  const formatCurrency = (amount: number) => {
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
+  };
 
-  const formatNumber = (num: number) => 
-    new Intl.NumberFormat('en-BD').format(num);
+  const formatNumber = (num: number) =>
+    new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(num));
 
   // Calculate metrics
   const metrics = useMemo(() => {
     if (!project) return null;
-    
+
     const total = Number(project.totalProjectValue || 0);
     const bills = project.bills || [];
     const received = bills.reduce((sum: number, b: any) => sum + Number(b.receivedAmount || 0), 0);
@@ -72,6 +78,22 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
 
     return { total, received, remaining, receivedPct, remainingPct };
   }, [project]);
+
+  // Prepare bills with computed fields for sorting
+  const billsWithComputed = useMemo(() => {
+    if (!project?.bills) return [];
+    return project.bills.map((bill: any) => ({
+      ...bill,
+      _billAmount: Number(bill.billAmount || 0),
+      _receivedAmount: Number(bill.receivedAmount || 0),
+      _remaining: Number(bill.billAmount || 0) - Number(bill.receivedAmount || 0),
+      _billPercent: Number(bill.billPercent || 0),
+      _tentativeDate: bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate).getTime() : 0,
+      _receivedDate: bill.receivedDate ? new Date(bill.receivedDate).getTime() : 0,
+    }));
+  }, [project]);
+
+  const { sortedData: sortedBills, sortConfig, handleSort } = useSorting(billsWithComputed);
 
   // Time series data for line chart
   const timeSeriesData = useMemo(() => {
@@ -103,85 +125,93 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     const nextBill = bills.find((b: any) => b.status !== 'PAID');
 
     return (
-      <div className="space-y-4 text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
-        <p className="text-xl md:text-2xl">
+      <div className="space-y-3 md:space-y-4 text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+        <p className="text-sm md:text-xl lg:text-2xl">
           The project <span className="font-bold text-primary underline decoration-primary/30 underline-offset-4">"{project.projectName}"</span> represents a strategic
-          engagement valued at <span className="text-2xl md:text-3xl font-black text-primary tracking-tighter mx-1">{formatCurrency(total)}</span>.
+          engagement valued at <span className="text-base md:text-2xl lg:text-3xl font-black text-primary tracking-tighter mx-1">{formatCurrency(total)}</span>.
         </p>
 
-        <p className="text-xl md:text-2xl">
-          To date, the financial received stands at a healthy <span className="text-3xl font-black text-success mx-1">{receivedPct.toFixed(1)}%</span>,
+        <p className="text-sm md:text-xl lg:text-2xl">
+          To date, the financial received stands at a healthy <span className="text-lg md:text-3xl font-black text-success mx-1">{receivedPct.toFixed(1)}%</span>,
           with a total of <span className="font-bold text-success underline decoration-success/30">{formatCurrency(received)}</span> successfully collected.
           {partialCount > 0 && (
-            <> This includes <span className="font-bold text-amber-500">{partialCount} milestone(s)</span> currently in <span className="italic text-amber-600">partial received</span>, highlighting active cash flow cycles.</>
+            <> This includes <span className="font-bold text-amber-500">{partialCount} milestone(s)</span> currently in <span className="italic text-amber-600">partial received</span>.</>
           )}
         </p>
 
         {nextBill && (
-          <p className="text-xl md:text-2xl">
+          <p className="text-sm md:text-xl lg:text-2xl">
             The immediate collection target is focused on the <span className="font-bold text-slate-900 dark:text-white">"{nextBill.billName}"</span> phase.
-            This milestone accounts for <span className="font-bold px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">{nextBill.billPercent}%</span> of the
-            contract, with <span className="font-bold text-primary">{formatCurrency(nextBill.billAmount)}</span> scheduled for received.
+            This milestone accounts for <span className="font-bold px-1 md:px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs md:text-base">{nextBill.billPercent}%</span> of the
+            contract, with <span className="font-bold text-primary">{formatCurrency(nextBill.billAmount)}</span> scheduled.
           </p>
         )}
 
-        <p className="text-xl md:text-2xl pt-2 border-t border-slate-200 dark:border-slate-800">
-          The current outstanding exposure remains at <span className="text-3xl font-black text-destructive/80 mx-1">{formatCurrency(remaining)}</span>.
+        <p className="text-sm md:text-xl lg:text-2xl pt-2 border-t border-slate-200 dark:border-slate-800">
+          Outstanding exposure: <span className="text-lg md:text-3xl font-black text-destructive/80 mx-1">{formatCurrency(remaining)}</span>.
         </p>
       </div>
     );
   }, [project, metrics]);
 
-  if (loading) return <div className="p-10 space-y-6"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (loading) return <div className="p-4 md:p-10 space-y-4 md:space-y-6"><Skeleton className="h-24 md:h-32 w-full" /><Skeleton className="h-48 md:h-64 w-full" /></div>;
   if (!project || !metrics) return null;
 
   return (
     <DashboardLayout title="Project Analytics">
-      <div className="space-y-10 pb-20">
+      <div className="space-y-6 md:space-y-10 pb-20">
 
         {/* 1. Header Row */}
         <div className="flex justify-between items-center">
-          <Button variant="ghost" onClick={() => router.push('/projects')} className="gap-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to Projects
+          <Button variant="ghost" onClick={() => router.push('/projects')} className="gap-1 md:gap-2 -ml-2 text-muted-foreground hover:text-primary transition-colors text-xs md:text-sm px-2 md:px-4">
+            <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to</span> Projects
           </Button>
-          <div className="flex gap-2">
-            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 font-bold">
+          <div className="flex items-center gap-2">
+            <EditProjectDialog
+              project={project}
+              onSuccess={() => {
+                fetch(`/api/projects/${id}`)
+                  .then(res => res.json())
+                  .then(data => setProject(data));
+              }}
+            />
+            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-2 md:px-3 py-1 font-bold text-xs">
               {project.category?.name}
             </Badge>
           </div>
         </div>
 
         {/* 2. Top Level Metrics - Enhanced with Received & Remaining */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="glass-card p-8 rounded-3xl border-border/50 flex flex-col justify-between relative overflow-hidden group">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+          <div className="glass-card p-4 md:p-8 rounded-2xl md:rounded-3xl border-border/50 flex flex-col justify-between relative overflow-hidden group">
             <div className="relative z-10">
-              <p className="text-xs font-black text-primary uppercase tracking-[0.2em] mb-2">{project.client?.name}</p>
-              <h1 className="text-4xl md:text-5xl font-black tracking-tight text-foreground mb-6">{project.projectName}</h1>
-              <div className="flex flex-wrap gap-8">
+              <p className="text-[10px] md:text-xs font-black text-primary uppercase tracking-[0.15em] md:tracking-[0.2em] mb-1 md:mb-2">{project.client?.name}</p>
+              <h1 className="text-2xl md:text-4xl lg:text-5xl font-black tracking-tight text-foreground mb-4 md:mb-6">{project.projectName}</h1>
+              <div className="flex flex-wrap gap-4 md:gap-8">
                 <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Contract Value</p>
-                  <p className="text-2xl font-bold">{formatCurrency(metrics.total)}</p>
+                  <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-0.5 md:mb-1">Contract Value</p>
+                  <p className="text-lg md:text-2xl font-bold">{formatCurrency(metrics.total)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Department</p>
-                  <p className="text-2xl font-bold text-slate-500">{project.department?.name}</p>
+                  <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-0.5 md:mb-1">Department</p>
+                  <p className="text-lg md:text-2xl font-bold text-slate-500">{project.department?.name}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
             {/* Received Card */}
-            <div className="glass-card p-6 rounded-3xl border-t-8 border-success flex flex-col items-center justify-center text-center shadow-xl shadow-success/5">
-              <Target className="w-6 h-6 text-success mb-2" />
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Received</p>
-              <p className="text-4xl font-black text-success my-2">
+            <div className="glass-card p-4 md:p-6 rounded-2xl md:rounded-3xl border-t-4 md:border-t-8 border-success flex flex-col items-center justify-center text-center shadow-xl shadow-success/5">
+              <Target className="w-5 h-5 md:w-6 md:h-6 text-success mb-1 md:mb-2" />
+              <p className="text-[8px] md:text-[9px] font-black text-muted-foreground uppercase tracking-widest">Received</p>
+              <p className="text-2xl md:text-4xl font-black text-success my-1 md:my-2">
                 {Math.round(metrics.receivedPct)}%
               </p>
-              <p className="text-xs font-bold text-muted-foreground">
+              <p className="text-[10px] md:text-xs font-bold text-muted-foreground">
                 {formatCurrency(metrics.received)}
               </p>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-3">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 md:h-1.5 rounded-full mt-2 md:mt-3">
                 <div
                   className="bg-success h-full transition-all duration-1000 rounded-full"
                   style={{ width: `${metrics.receivedPct}%` }}
@@ -190,16 +220,16 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Remaining Card */}
-            <div className="glass-card p-6 rounded-3xl border-t-8 border-destructive/60 flex flex-col items-center justify-center text-center shadow-xl shadow-destructive/5">
-              <Target className="w-6 h-6 text-destructive/80 mb-2" />
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Remaining</p>
-              <p className="text-4xl font-black text-destructive/80 my-2">
+            <div className="glass-card p-4 md:p-6 rounded-2xl md:rounded-3xl border-t-4 md:border-t-8 border-destructive/60 flex flex-col items-center justify-center text-center shadow-xl shadow-destructive/5">
+              <Target className="w-5 h-5 md:w-6 md:h-6 text-destructive/80 mb-1 md:mb-2" />
+              <p className="text-[8px] md:text-[9px] font-black text-muted-foreground uppercase tracking-widest">Remaining</p>
+              <p className="text-2xl md:text-4xl font-black text-destructive/80 my-1 md:my-2">
                 {Math.round(metrics.remainingPct)}%
               </p>
-              <p className="text-xs font-bold text-muted-foreground">
+              <p className="text-[10px] md:text-xs font-bold text-muted-foreground">
                 {formatCurrency(metrics.remaining)}
               </p>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-3">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 md:h-1.5 rounded-full mt-2 md:mt-3">
                 <div
                   className="bg-destructive/60 h-full transition-all duration-1000 rounded-full"
                   style={{ width: `${metrics.remainingPct}%` }}
@@ -210,19 +240,20 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* 3. Milestone Itemization - Collapsible with Column Settings */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-primary" />
-              <h3 className="font-black uppercase tracking-wider text-sm">Milestone Itemization</h3>
-              <Badge variant="outline" className="text-xs">
-                {project.bills?.length || 0} Milestones
+        <div className="space-y-3 md:space-y-4">
+          <div className="flex items-center justify-between px-1 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Receipt className="w-4 h-4 md:w-5 md:h-5 text-primary shrink-0" />
+              <h3 className="font-black uppercase tracking-wider text-xs md:text-sm truncate">Milestones</h3>
+              <Badge variant="outline" className="text-[10px] md:text-xs shrink-0">
+                {project.bills?.length || 0}
               </Badge>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1 md:gap-2 shrink-0">
+              {/* Column settings - hidden on mobile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-1 md:gap-2 hidden md:flex">
                     <Settings2 size={14} /> Columns
                   </Button>
                 </DropdownMenuTrigger>
@@ -281,37 +312,156 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                 variant="ghost"
                 size="sm"
                 onClick={() => setMilestonesExpanded(!milestonesExpanded)}
-                className="gap-2"
+                className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-9"
               >
                 {milestonesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                {milestonesExpanded ? 'Collapse' : 'Expand'}
+                <span className="hidden sm:inline">{milestonesExpanded ? 'Collapse' : 'Expand'}</span>
               </Button>
             </div>
           </div>
 
           {milestonesExpanded && (
-            <div className="glass-card rounded-3xl overflow-hidden border-border/50 shadow-sm">
-              <div className="overflow-x-auto">
-                <Table>
+            <>
+              {/* Mobile Card View for Milestones */}
+              <div className="md:hidden space-y-3">
+                {sortedBills.map((bill: any) => {
+                  const remaining = bill._remaining;
+                  const receivedPctOfProject = metrics.total > 0
+                    ? ((bill._receivedAmount / metrics.total) * 100).toFixed(1)
+                    : '0';
+
+                  return (
+                    <div key={bill.id} className="glass-card rounded-xl p-4 border-border/50">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-sm truncate">{bill.billName}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {bill.tentativeBillingDate
+                              ? format(new Date(bill.tentativeBillingDate), 'MMM dd, yyyy')
+                              : 'No date'}
+                          </p>
+                        </div>
+                        <Badge className={cn(
+                          "font-black text-[9px] px-2 shrink-0",
+                          bill.status === 'PAID' ? "bg-success/10 text-success border-success/30" :
+                            bill.status === 'PARTIAL' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" :
+                              "bg-slate-100 text-slate-500 border-slate-200"
+                        )} variant="outline">
+                          {bill.status}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                        <div>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold">Alloc</p>
+                          <p className="text-sm font-bold">{bill.billPercent}%</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold">Expected</p>
+                          <p className="text-sm font-bold">{formatCurrency(bill._billAmount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold">Received</p>
+                          <p className="text-sm font-bold text-success">{formatCurrency(bill._receivedAmount)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                        <p className="text-xs text-muted-foreground">
+                          Remaining: <span className="font-bold text-destructive/80">{formatCurrency(remaining)}</span>
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <EditBillDialog
+                            bill={bill}
+                            totalProjectValue={metrics.total}
+                            onSuccess={() => {
+                              fetch(`/api/projects/${id}`)
+                                .then(res => res.json())
+                                .then(data => setProject(data));
+                            }}
+                            triggerButton={
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Pencil size={14} />
+                              </Button>
+                            }
+                          />
+                          {bill.status !== 'PAID' ? (
+                            <RecordPaymentDialog
+                              bill={bill}
+                              totalProjectValue={metrics.total}
+                              onSuccess={() => {
+                                fetch(`/api/projects/${id}`)
+                                  .then(res => res.json())
+                                  .then(data => setProject(data));
+                              }}
+                            />
+                          ) : (
+                            <span className="text-xs font-black text-success flex items-center gap-1">
+                              <CheckCircle2 size={12} /> SETTLED
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block glass-card rounded-3xl overflow-hidden border-border/50 shadow-sm">
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent border-b-border/50">
-                      {columnVisibility.phase && <TableHead className="font-black text-[10px] uppercase p-6">Phase Description</TableHead>}
-                      {columnVisibility.allocation && <TableHead className="text-center font-black text-[10px] uppercase">Allocation</TableHead>}
-                      {columnVisibility.expected && <TableHead className="font-black text-[10px] uppercase">Expected</TableHead>}
-                      {columnVisibility.received && <TableHead className="font-black text-[10px] uppercase">Received</TableHead>}
-                      {columnVisibility.remaining && <TableHead className="font-black text-[10px] uppercase">Remaining</TableHead>}
-                      {columnVisibility.tentativeDate && <TableHead className="font-black text-[10px] uppercase">Tentative Date</TableHead>}
-                      {columnVisibility.receivedDate && <TableHead className="font-black text-[10px] uppercase">Received Date</TableHead>}
-                      {columnVisibility.status && <TableHead className="font-black text-[10px] uppercase text-center">Status</TableHead>}
+                      {columnVisibility.phase && (
+                        <TableHead className="font-black text-[10px] uppercase p-6">
+                          <SortableHeader label="Phase Description" sortKey="billName" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.allocation && (
+                        <TableHead className="text-center font-black text-[10px] uppercase">
+                          <SortableHeader label="Allocation" sortKey="_billPercent" currentSort={sortConfig} onSort={handleSort} className="justify-center" />
+                        </TableHead>
+                      )}
+                      {columnVisibility.expected && (
+                        <TableHead className="font-black text-[10px] uppercase">
+                          <SortableHeader label="Expected" sortKey="_billAmount" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.received && (
+                        <TableHead className="font-black text-[10px] uppercase">
+                          <SortableHeader label="Received" sortKey="_receivedAmount" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.remaining && (
+                        <TableHead className="font-black text-[10px] uppercase">
+                          <SortableHeader label="Remaining" sortKey="_remaining" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.tentativeDate && (
+                        <TableHead className="font-black text-[10px] uppercase">
+                          <SortableHeader label="Tentative Date" sortKey="_tentativeDate" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.receivedDate && (
+                        <TableHead className="font-black text-[10px] uppercase">
+                          <SortableHeader label="Received Date" sortKey="_receivedDate" currentSort={sortConfig} onSort={handleSort} />
+                        </TableHead>
+                      )}
+                      {columnVisibility.status && (
+                        <TableHead className="font-black text-[10px] uppercase text-center">
+                          <SortableHeader label="Status" sortKey="status" currentSort={sortConfig} onSort={handleSort} className="justify-center" />
+                        </TableHead>
+                      )}
                       {columnVisibility.actions && <TableHead className="font-black text-[10px] uppercase text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {project.bills?.map((bill: any) => {
-                      const remaining = Number(bill.billAmount) - Number(bill.receivedAmount || 0);
+                    {sortedBills.map((bill: any) => {
+                      const remaining = bill._remaining;
                       // All percentages are now relative to TOTAL PROJECT VALUE (100%)
                       const receivedPctOfProject = metrics.total > 0
-                        ? ((Number(bill.receivedAmount || 0) / metrics.total) * 100).toFixed(2)
+                        ? ((bill._receivedAmount / metrics.total) * 100).toFixed(2)
                         : '0';
                       const remainingPctOfProject = metrics.total > 0
                         ? ((remaining / metrics.total) * 100).toFixed(2)
@@ -385,8 +535,8 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                           )}
                           {columnVisibility.actions && (
                             <TableCell className="text-right">
-                              {bill.status !== 'PAID' ? (
-                                <RecordPaymentDialog
+                              <div className="flex items-center justify-end gap-2">
+                                <EditBillDialog
                                   bill={bill}
                                   totalProjectValue={metrics.total}
                                   onSuccess={() => {
@@ -395,31 +545,44 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                                       .then(data => setProject(data));
                                   }}
                                 />
-                              ) : (
-                                <span className="text-xs font-black text-success flex items-center justify-end gap-1">
-                                  <CheckCircle2 size={14} /> SETTLED
-                                </span>
-                              )}
+                                {bill.status !== 'PAID' ? (
+                                  <RecordPaymentDialog
+                                    bill={bill}
+                                    totalProjectValue={metrics.total}
+                                    onSuccess={() => {
+                                      fetch(`/api/projects/${id}`)
+                                        .then(res => res.json())
+                                        .then(data => setProject(data));
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="text-xs font-black text-success flex items-center gap-1">
+                                    <CheckCircle2 size={14} /> SETTLED
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                           )}
                         </TableRow>
                       );
                     })}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
-        {/* 4. Sliding Chart Carousel */}
-        <div className="space-y-4">
+        {/* 4. Charts Section - Stacked on mobile, Carousel on desktop */}
+        <div className="space-y-3 md:space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <h3 className="font-black uppercase tracking-wider text-sm">Financial Visualizations</h3>
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+              <h3 className="font-black uppercase tracking-wider text-xs md:text-sm">Charts</h3>
             </div>
-            <div className="flex gap-2">
+            {/* Carousel controls - desktop only */}
+            <div className="hidden md:flex gap-2">
               <Button
                 variant="outline"
                 size="icon"
@@ -441,8 +604,43 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[2rem]">
-            <div 
+          {/* Mobile: Single stacked chart */}
+          <div className="md:hidden glass-card p-4 rounded-xl border-border/50">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3">Milestone Breakdown</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={project.bills?.map((b: any) => ({
+                    name: b.billName.length > 10 ? b.billName.substring(0, 8) + '..' : b.billName,
+                    received: Number(b.receivedAmount || 0),
+                    due: Math.max(0, Number(b.billAmount) - Number(b.receivedAmount || 0))
+                  }))}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 40 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={50}
+                    tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={(val) => `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(val)}`}
+                    width={45}
+                  />
+                  <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                  <Bar name="Received" dataKey="received" stackId="a" fill="hsl(173, 80%, 36%)" />
+                  <Bar name="Due" dataKey="due" stackId="a" fill="hsl(0, 84%, 60%, 0.2)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Desktop: Sliding Carousel */}
+          <div className="hidden md:block relative overflow-hidden rounded-[2rem]">
+            <div
               className={cn(
                 "flex transition-transform duration-700 ease-in-out",
                 chartPosition === 'left' ? 'translate-x-0' : '-translate-x-[50%]'
@@ -455,14 +653,14 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={timeSeriesData} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         angle={-45}
                         textAnchor="end"
                         height={80}
                         tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
                       />
-                      <YAxis 
+                      <YAxis
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         tickFormatter={(val) => `৳${formatNumber(val)}`}
                       />
@@ -492,14 +690,14 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                       margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis 
-                        dataKey="name" 
+                      <XAxis
+                        dataKey="name"
                         angle={-45}
                         textAnchor="end"
                         height={80}
                         tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
                       />
-                      <YAxis 
+                      <YAxis
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         tickFormatter={(val) => `৳${formatNumber(val)}`}
                       />
@@ -529,25 +727,25 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
 
         {/* 5. Intelligence Narrative - Moved to Last & Collapsible */}
         <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-success/20 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
-          <div className="relative glass-card rounded-[2rem] border-border/50 shadow-2xl overflow-hidden">
-            <div 
-              className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/5 transition-colors"
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-success/20 rounded-xl md:rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+          <div className="relative glass-card rounded-xl md:rounded-[2rem] border-border/50 shadow-2xl overflow-hidden">
+            <div
+              className="flex items-center justify-between p-4 md:p-6 cursor-pointer hover:bg-muted/5 transition-colors"
               onClick={() => setNarrativeExpanded(!narrativeExpanded)}
             >
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-2xl">
-                  <Sparkles className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="p-2 md:p-3 bg-primary/10 rounded-xl md:rounded-2xl">
+                  <Sparkles className="w-4 h-4 md:w-6 md:h-6 text-primary" />
                 </div>
-                <h3 className="text-sm font-black uppercase tracking-[0.3em] text-primary">Project Intelligence Narrative</h3>
+                <h3 className="text-[10px] md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.3em] text-primary">Intelligence</h3>
               </div>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="h-8 w-8 md:h-9 md:w-9 p-0">
                 {narrativeExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </Button>
             </div>
-            
+
             {narrativeExpanded && (
-              <div className="p-10 md:p-14 pt-0 animate-in slide-in-from-top-2">
+              <div className="p-4 md:p-10 lg:p-14 pt-0 animate-in slide-in-from-top-2">
                 {renderIntelligenceNarrative}
               </div>
             )}

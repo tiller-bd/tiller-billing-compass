@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Building2, TrendingUp, Sparkles, Award, Wallet } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, Sparkles, Award, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format, differenceInMonths } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,6 +15,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     const { id } = React.use(params);
     const [client, setClient] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [narrativeExpanded, setNarrativeExpanded] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -24,8 +25,11 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
         });
     }, [id]);
 
-    const formatCurrency = (v: number) =>
-        new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', maximumFractionDigits: 0 }).format(v);
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatCurrency = (v: number) => {
+        const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(v));
+        return `৳${formatted}`;
+    };
 
     // --- Intelligence Narrative ---
     const narrative = useMemo(() => {
@@ -74,18 +78,6 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
         <DashboardLayout title="Client Intelligence" >
             <div className="space-y-10 pb-20">
                 <Button variant="ghost" onClick={() => router.push('/clients')} className="gap-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft size={16} /> All Clients</Button>
-
-                {/* Narrative Card */}
-                <div className="relative group">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-success/20 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
-                    <div className="relative glass-card p-10 md:p-14 rounded-[2rem] border-border/50 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="p-3 bg-primary/10 rounded-2xl"><Sparkles className="w-6 h-6 text-primary" /></div>
-                            <h3 className="text-sm font-black uppercase tracking-[0.3em] text-primary">Strategic Client Relationship Narrative</h3>
-                        </div>
-                        {narrative}
-                    </div>
-                </div>
 
                 {/* Dept Comparison & Projects */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -149,6 +141,35 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                             ))}
                         </TableBody>
                     </Table>
+                </div>
+
+                {/* Narrative Card - Collapsible - Last Section */}
+                <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-success/20 rounded-xl md:rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                    <div className="relative glass-card rounded-xl md:rounded-[2rem] border-border/50 shadow-2xl overflow-hidden">
+                        <div
+                            className="flex items-center justify-between p-4 md:p-6 cursor-pointer hover:bg-muted/5 transition-colors"
+                            onClick={() => setNarrativeExpanded(!narrativeExpanded)}
+                        >
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="p-2 md:p-3 bg-primary/10 rounded-xl md:rounded-2xl">
+                                    <Sparkles className="w-4 h-4 md:w-6 md:h-6 text-primary" />
+                                </div>
+                                <h3 className="text-[10px] md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.3em] text-primary">
+                                    Strategic Client Relationship Narrative
+                                </h3>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                {narrativeExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </Button>
+                        </div>
+
+                        {narrativeExpanded && (
+                            <div className="p-4 md:p-10 lg:p-14 pt-0 animate-in slide-in-from-top-2">
+                                {narrative}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </DashboardLayout>

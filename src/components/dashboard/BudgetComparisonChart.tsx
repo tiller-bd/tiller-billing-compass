@@ -14,11 +14,9 @@ interface BudgetComparisonChartProps {
 
 export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetComparisonChartProps) {
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency',
-      currency: 'BDT',
-      maximumFractionDigits: 0,
-    }).format(value);
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value));
+    return `৳${formatted}`;
   };
 
   return (
@@ -46,11 +44,8 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
                 tickLine={false}
                 tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }}
                 tickFormatter={(value) => {
-                  // Values are already in millions from the API
-                  if (value >= 1) {
-                    return `৳${value.toLocaleString('en-IN')}M`;
-                  }
-                  return `৳${(value * 1000).toLocaleString('en-IN')}K`;
+                  // Use Indian numbering system - show full numbers
+                  return `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value))}`;
                 }}
               />
               <YAxis 

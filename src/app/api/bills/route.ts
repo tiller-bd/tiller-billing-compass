@@ -85,3 +85,66 @@ export async function GET(request: NextRequest) {
     return handlePrismaError(error);
   }
 }
+
+export async function POST(request: NextRequest) {
+  const session = await verifyAuth();
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const body = await request.json();
+    const {
+      projectId,
+      billName,
+      billPercent,
+      billAmount,
+      tentativeBillingDate,
+      status,
+      slNo,
+    } = body;
+
+    if (!projectId) {
+      return apiError("Project ID is required", "VALIDATION_ERROR");
+    }
+
+    if (billAmount === undefined || billAmount === null) {
+      return apiError("Bill amount is required", "VALIDATION_ERROR");
+    }
+
+    // Verify project exists
+    const project = await prisma.project.findUnique({
+      where: { id: parseInt(projectId) },
+    });
+
+    if (!project) {
+      return apiError("Project not found", "NOT_FOUND");
+    }
+
+    const newBill = await prisma.projectBill.create({
+      data: {
+        projectId: parseInt(projectId),
+        billName: billName || null,
+        billPercent: billPercent ? parseFloat(billPercent) : null,
+        billAmount: parseFloat(billAmount),
+        tentativeBillingDate: tentativeBillingDate
+          ? new Date(tentativeBillingDate)
+          : null,
+        status: status || "PENDING",
+        slNo: slNo || null,
+        receivedAmount: 0,
+      },
+      include: {
+        project: {
+          include: {
+            client: true,
+            department: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(newBill, { status: 201 });
+  } catch (error) {
+    console.error("Bill create error:", error);
+    return handlePrismaError(error);
+  }
+}

@@ -102,53 +102,55 @@ export default function ProjectsPage() {
 
   return (
     <DashboardLayout title="Projects" >
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Project Management</h1>
+          <h1 className="text-lg md:text-2xl font-bold">Project Management</h1>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading}>
+            <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading} className="h-9 w-9">
               <RefreshCw className={loading ? "animate-spin" : ""} size={16} />
             </Button>
             {/* Controlled AddProjectDialog */}
-            <AddProjectDialog 
-              open={isAddProjectOpen} 
-              setOpen={setIsAddProjectOpen} 
-              onProjectAdded={fetchProjects} 
+            <AddProjectDialog
+              open={isAddProjectOpen}
+              setOpen={setIsAddProjectOpen}
+              onProjectAdded={fetchProjects}
             />
           </div>
         </div>
 
-        {/* Filter Bar - Search is in header */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 glass-card rounded-xl border border-border/50">
-          <Select value={deptFilter} onValueChange={setDeptFilter}>
-            <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Department" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="ONGOING">Ongoing</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Year" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              {[2024, 2025, 2026].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        {/* Filter Bar - Scrollable on mobile */}
+        <div className="glass-card rounded-xl border border-border/50 p-3 md:p-4 overflow-x-auto">
+          <div className="flex md:grid md:grid-cols-4 gap-2 md:gap-3 min-w-max md:min-w-0">
+            <Select value={deptFilter} onValueChange={setDeptFilter}>
+              <SelectTrigger className="bg-secondary/30 w-32 md:w-full text-xs md:text-sm"><SelectValue placeholder="Department" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={catFilter} onValueChange={setCatFilter}>
+              <SelectTrigger className="bg-secondary/30 w-32 md:w-full text-xs md:text-sm"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="bg-secondary/30 w-28 md:w-full text-xs md:text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="ONGOING">Ongoing</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={yearFilter} onValueChange={setYearFilter}>
+              <SelectTrigger className="bg-secondary/30 w-24 md:w-full text-xs md:text-sm"><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {[2024, 2025, 2026].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {loading ? (
@@ -174,32 +176,33 @@ export default function ProjectsPage() {
               onProjectClick={(project: any) => router.push(`/projects/${project.id}`)}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-              <div className="glass-card p-6 rounded-xl border border-border/50">
-                <h3 className="text-sm font-bold flex items-center gap-2 mb-6"><TrendingUp size={16}/> Onboarding Trend</h3>
-                <div className="h-64">
+            {/* Charts - Hidden on mobile for performance, shown on tablet+ */}
+            <div className="hidden sm:grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
+              <div className="glass-card p-4 md:p-6 rounded-xl border border-border/50">
+                <h3 className="text-xs md:text-sm font-bold flex items-center gap-2 mb-4 md:mb-6"><TrendingUp size={16}/> Onboarding Trend</h3>
+                <div className="h-48 md:h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData.trend}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" fontSize={12} />
-                      <YAxis fontSize={12} />
+                      <XAxis dataKey="month" fontSize={10} />
+                      <YAxis fontSize={10} />
                       <Tooltip />
-                      <Line type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={3} dot={{r: 4}} />
+                      <Line type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} dot={{r: 3}} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="glass-card p-6 rounded-xl border border-border/50">
-                <h3 className="text-sm font-bold flex items-center gap-2 mb-6"><BarChart3 size={16}/> Budget Received (Actual Amounts)</h3>
-                <div className="h-64">
+              <div className="glass-card p-4 md:p-6 rounded-xl border border-border/50">
+                <h3 className="text-xs md:text-sm font-bold flex items-center gap-2 mb-4 md:mb-6"><BarChart3 size={16}/> Budget Received</h3>
+                <div className="h-48 md:h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData.received} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                      <XAxis type="number" fontSize={10} tickFormatter={(v) => `৳${v.toLocaleString()}`} />
-                      <YAxis dataKey="name" type="category" fontSize={10} width={80} />
-                      <Tooltip formatter={(v: number) => `৳${v.toLocaleString()}`} />
-                      <Legend />
+                      <XAxis type="number" fontSize={9} tickFormatter={(v) => `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(v)}`} />
+                      <YAxis dataKey="name" type="category" fontSize={9} width={60} />
+                      <Tooltip formatter={(v: number) => `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(v)}`} />
+                      <Legend wrapperStyle={{fontSize: '10px'}} />
                       <Bar name="Received" dataKey="received" stackId="a" fill="hsl(173, 80%, 36%)" />
                       <Bar name="Due" dataKey="due" stackId="a" fill="hsl(var(--destructive))" opacity={0.3} />
                     </BarChart>

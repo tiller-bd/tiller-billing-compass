@@ -1,7 +1,7 @@
 // src/app/users/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { User, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSharedFilters } from '@/contexts/FilterContext';
+import { SortableHeader, useSorting } from '@/components/ui/sortable-header';
 
 export default function Users() {
   const { debouncedSearch } = useSharedFilters();
@@ -37,10 +38,15 @@ export default function Users() {
   useEffect(() => { loadUsers(); }, []);
 
   // Filter users based on header search
-  const filteredUsers = users.filter(u =>
-    u.full_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  const filteredUsers = useMemo(() => {
+    return users.filter(u =>
+      u.full_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
+  }, [users, debouncedSearch]);
+
+  // Sorting
+  const { sortedData, sortConfig, handleSort } = useSorting(filteredUsers);
 
   const handleToggleSuspend = async (user: User) => {
     if (!isSuperAdmin) return;
@@ -96,15 +102,23 @@ export default function Users() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>
+                  <SortableHeader label="User" sortKey="full_name" currentSort={sortConfig} onSort={handleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortableHeader label="Email" sortKey="email" currentSort={sortConfig} onSort={handleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortableHeader label="Role" sortKey="role" currentSort={sortConfig} onSort={handleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortableHeader label="Status" sortKey="is_active" currentSort={sortConfig} onSort={handleSort} />
+                </TableHead>
                 {isSuperAdmin && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {sortedData.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>

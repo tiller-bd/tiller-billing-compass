@@ -19,6 +19,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ApiClientError, apiPatch } from "@/lib/api-client";
+import {
+  roundAmount,
+  calculatePercentage,
+  calculateAmountFromPercentage,
+  validatePercentageInput,
+  formatBDT,
+} from "@/lib/financial-utils";
 
 interface ProjectBill {
   id: number;
@@ -58,17 +65,17 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
     return today.toISOString().split('T')[0];
   };
 
-  // Core values
-  const projectTotal = Number(totalProjectValue || 0);
-  const billAmount = Number(bill.billAmount);
+  // Core values - Amount is the source of truth (integers only)
+  const projectTotal = roundAmount(Number(totalProjectValue || 0));
+  const billAmount = roundAmount(Number(bill.billAmount));
   const billPercent = Number(bill.billPercent || 0);
-  const currentReceived = Number(bill.receivedAmount || 0);
+  const currentReceived = roundAmount(Number(bill.receivedAmount || 0));
   const remainingAmount = billAmount - currentReceived;
 
-  // All percentages are now relative to TOTAL PROJECT VALUE (100%)
-  const billPercentOfProject = projectTotal > 0 ? (billAmount / projectTotal) * 100 : billPercent;
-  const currentReceivedPercentOfProject = projectTotal > 0 ? (currentReceived / projectTotal) * 100 : 0;
-  const remainingPercentOfProject = projectTotal > 0 ? (remainingAmount / projectTotal) * 100 : 0;
+  // All percentages are derived from amounts (calculated, not stored)
+  const billPercentOfProject = calculatePercentage(billAmount, projectTotal);
+  const currentReceivedPercentOfProject = calculatePercentage(currentReceived, projectTotal);
+  const remainingPercentOfProject = calculatePercentage(remainingAmount, projectTotal);
 
   const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<PaymentFormData>({
     defaultValues: {
@@ -107,9 +114,9 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
 
   const watchedAmount = watch("receivedAmount");
 
-  // Handle amount change - calculate percentage (relative to TOTAL PROJECT VALUE)
+  // Handle amount change - Amount is the source of truth
   const handleAmountChange = (value: string) => {
-    const amount = Number(value || 0);
+    let amount = roundAmount(Number(value || 0));
 
     if (amount < 0) {
       setValue("receivedAmount", "0");
@@ -119,19 +126,18 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
 
     if (amount > remainingAmount) {
       toast.warning(`Amount cannot exceed remaining ${formatCurrency(remainingAmount)}`);
-      setValue("receivedAmount", remainingAmount.toString());
-      setValue("receivedPercent", remainingPercentOfProject.toFixed(2));
-      return;
+      amount = remainingAmount;
     }
 
-    // Percentage is now relative to TOTAL PROJECT VALUE (not bill amount)
-    const percentOfProject = projectTotal > 0 ? (amount / projectTotal) * 100 : 0;
+    setValue("receivedAmount", amount.toString());
+    // Percentage is always derived from amount
+    const percentOfProject = calculatePercentage(amount, projectTotal);
     setValue("receivedPercent", percentOfProject.toFixed(2));
   };
 
-  // Handle percentage change - calculate amount (percentage is of TOTAL PROJECT VALUE)
+  // Handle percentage change - Convert to amount first (amount is source of truth)
   const handlePercentChange = (value: string) => {
-    let percent = Number(value || 0);
+    const percent = Number(value || 0);
 
     if (percent < 0) {
       setValue("receivedPercent", "0");
@@ -139,26 +145,27 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
       return;
     }
 
-    if (percent > remainingPercentOfProject) {
-      toast.warning(`Percentage cannot exceed remaining ${remainingPercentOfProject.toFixed(2)}%`);
-      setValue("receivedPercent", remainingPercentOfProject.toFixed(2));
-      setValue("receivedAmount", remainingAmount.toString());
-      return;
+    // Use the utility to validate and convert
+    const result = validatePercentageInput(percent, projectTotal, remainingAmount);
+
+    if (!result.valid && result.message) {
+      toast.warning(result.message);
     }
 
-    // Convert percentage of project to amount
-    const amount = (percent / 100) * projectTotal;
-    setValue("receivedAmount", Math.round(amount).toString());
+    // Set the corrected/validated amount (source of truth)
+    setValue("receivedAmount", result.amount.toString());
+    // Set the recalculated percentage from the actual amount
+    setValue("receivedPercent", result.percentage.toFixed(2));
   };
 
-  // Calculate final values for confirmation (percentages relative to TOTAL PROJECT VALUE)
+  // Calculate final values for confirmation (percentages derived from amounts)
   const calculateFinalValues = (data: PaymentFormData) => {
-    const newReceivedAmount = Number(data.receivedAmount);
+    const newReceivedAmount = roundAmount(Number(data.receivedAmount));
     const totalReceivedAmount = currentReceived + newReceivedAmount;
-    // Percentage is now of TOTAL PROJECT VALUE
-    const totalReceivedPercentOfProject = projectTotal > 0 ? (totalReceivedAmount / projectTotal) * 100 : 0;
+    // Percentages are always derived from amounts
+    const totalReceivedPercentOfProject = calculatePercentage(totalReceivedAmount, projectTotal);
     const newRemainingAmount = billAmount - totalReceivedAmount;
-    const newRemainingPercentOfProject = projectTotal > 0 ? (newRemainingAmount / projectTotal) * 100 : 0;
+    const newRemainingPercentOfProject = calculatePercentage(newRemainingAmount, projectTotal);
     const newStatus = totalReceivedAmount >= billAmount ? "PAID" : totalReceivedAmount > 0 ? "PARTIAL" : "PENDING";
 
     return {
@@ -242,12 +249,11 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
     toast.success("Draft cleared");
   };
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-BD', { 
-      style: 'currency', 
-      currency: 'BDT', 
-      maximumFractionDigits: 0 
-    }).format(amount);
+  // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
+  };
 
   return (
     <>
@@ -303,6 +309,7 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
         </div>
 
         {/* Payment Amount and Percentage (% of Total Project) */}
+        {/* IMPORTANT: Amount is the source of truth. Percentage is derived from amount. */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="receivedAmount" className="text-xs font-black uppercase text-muted-foreground">
@@ -311,16 +318,16 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
             <Input
               id="receivedAmount"
               type="number"
-              step="0.01"
+              step="1"
               min="0"
               max={remainingAmount}
               {...register("receivedAmount", {
                 required: "Amount is required",
-                min: { value: 0.01, message: "Amount must be positive" },
+                min: { value: 1, message: "Amount must be at least 1" },
                 max: { value: remainingAmount, message: `Cannot exceed ${formatCurrency(remainingAmount)}` }
               })}
               className="h-12 font-bold text-lg"
-              placeholder="0.00"
+              placeholder="0"
               onChange={(e) => handleAmountChange(e.target.value)}
             />
             {errors.receivedAmount && (
@@ -332,28 +339,21 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
 
           <div className="space-y-2">
             <Label htmlFor="receivedPercent" className="text-xs font-black uppercase text-muted-foreground">
-              % of Project *
+              % of Project
             </Label>
             <Input
               id="receivedPercent"
               type="number"
               step="0.01"
               min="0"
-              max={remainingPercentOfProject}
-              {...register("receivedPercent", {
-                required: "Percentage is required",
-                min: { value: 0.01, message: "Percentage must be positive" },
-                max: { value: remainingPercentOfProject, message: `Cannot exceed ${remainingPercentOfProject.toFixed(2)}%` }
-              })}
+              {...register("receivedPercent")}
               className="h-12 font-bold text-lg text-primary"
               placeholder="0.00"
               onChange={(e) => handlePercentChange(e.target.value)}
             />
-            {errors.receivedPercent && (
-              <p className="text-xs text-destructive font-bold">
-                {errors.receivedPercent.message}
-              </p>
-            )}
+            <p className="text-[10px] text-muted-foreground">
+              Max: {remainingPercentOfProject.toFixed(2)}% (auto-corrects)
+            </p>
           </div>
         </div>
 

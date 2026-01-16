@@ -52,7 +52,7 @@ export async function GET() {
       const received = allBills
         .filter(b => b.receivedDate && new Date(b.receivedDate).getMonth() === index && new Date(b.receivedDate).getFullYear() === currentYear)
         .reduce((sum, b) => sum + toNum(b.receivedAmount), 0);
-      return { month, received: received / 1000000 };
+      return { month, received };
     });
 
     // 3. Project Distribution
@@ -72,8 +72,8 @@ export async function GET() {
       const received = p.bills.reduce((sum, b) => sum + toNum(b.receivedAmount), 0);
       return {
         name: p.projectName.length > 15 ? p.projectName.substring(0, 15) + '...' : p.projectName,
-        received: received / 1000000,
-        remaining: (toNum(p.totalProjectValue) - received) / 1000000
+        received,
+        remaining: toNum(p.totalProjectValue) - received
       };
     });
 

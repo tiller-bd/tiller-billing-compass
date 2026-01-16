@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { 
-  CalendarDays, 
-  CheckCircle2, 
-  Settings2, 
-  ExternalLink 
+import {
+  CalendarDays,
+  CheckCircle2,
+  Settings2,
+  ExternalLink
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordPaymentDialog } from './RecordPaymentDialog';
 import { cn } from '@/lib/utils';
+import { SortableHeader, useSorting } from '@/components/ui/sortable-header';
 
 // Fixed Interface for Page synchronization
 interface BillingTableProps {
@@ -38,11 +39,25 @@ export function BillingTableSkeleton() {
 }
 
 export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTableProps) {
-  const [visibleColumns, setVisibleColumns] = useState({ 
-    client: true, 
-    department: true, 
-    received: true 
+  const [visibleColumns, setVisibleColumns] = useState({
+    client: true,
+    department: true,
+    received: true
   });
+
+  // Prepare data with computed fields for sorting
+  const billsWithComputed = useMemo(() => {
+    return bills.map((bill: any) => ({
+      ...bill,
+      _billAmount: Number(bill.billAmount || 0),
+      _receivedAmount: Number(bill.receivedAmount || 0),
+      _billPercent: Number(bill.billPercent || 0),
+      _projectName: bill.project?.projectName || '',
+      _tentativeDate: bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate).getTime() : 0,
+    }));
+  }, [bills]);
+
+  const { sortedData, sortConfig, handleSort } = useSorting(billsWithComputed);
 
   useEffect(() => {
     const saved = localStorage.getItem('billing_col_visibility_v5');
@@ -55,8 +70,11 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
     localStorage.setItem('billing_col_visibility_v5', JSON.stringify(next));
   };
 
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', notation: 'compact' }).format(val);
+  const formatCurrency = (val: number) => {
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(val));
+    return `৳${formatted}`;
+  };
 
   const getDeptBadge = (name: string) => {
     const n = name?.toLowerCase() || "";
@@ -68,7 +86,8 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden border border-border/50 shadow-sm">
-      <div className="flex justify-end p-2 border-b bg-muted/10">
+      {/* Column config - hidden on mobile */}
+      <div className="hidden md:flex justify-end p-2 border-b bg-muted/10">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs font-black uppercase tracking-tight">
@@ -79,10 +98,10 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
             <p className="text-[10px] font-black uppercase text-muted-foreground mb-4">Display Options</p>
             {Object.keys(visibleColumns).map(col => (
               <div key={col} className="flex items-center space-x-3 mb-3">
-                <Checkbox 
-                  id={`bill-col-${col}`} 
-                  checked={visibleColumns[col as keyof typeof visibleColumns]} 
-                  onCheckedChange={() => toggleCol(col as keyof typeof visibleColumns)} 
+                <Checkbox
+                  id={`bill-col-${col}`}
+                  checked={visibleColumns[col as keyof typeof visibleColumns]}
+                  onCheckedChange={() => toggleCol(col as keyof typeof visibleColumns)}
                 />
                 <label htmlFor={`bill-col-${col}`} className="text-sm font-bold capitalize cursor-pointer select-none">
                   {col}
@@ -93,23 +112,115 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
         </Popover>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile Card View */}
+      <div className="md:hidden divide-y divide-border">
+        {sortedData.map((bill) => {
+          const totalProjectVal = Number(bill.project?.totalProjectValue || 0);
+          const recAmt = bill._receivedAmount;
+          const billAmt = bill._billAmount;
+          const remaining = billAmt - recAmt;
+          const recPctOfProject = totalProjectVal > 0 ? ((recAmt / totalProjectVal) * 100).toFixed(2) : "0";
+          const remainingPctOfProject = totalProjectVal > 0 ? ((remaining / totalProjectVal) * 100).toFixed(2) : "0";
+          const dept = getDeptBadge(bill.project?.department?.name);
+
+          return (
+            <div key={bill.id} className="p-4 space-y-3">
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-foreground truncate">{bill.billName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{bill.project?.projectName}</p>
+                </div>
+                <Badge className={cn(
+                  "font-bold text-[10px] px-2 shrink-0",
+                  bill.status === 'PAID' ? "bg-success/10 text-success border-success/30" :
+                  bill.status === 'PARTIAL' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-muted text-slate-400"
+                )} variant="outline">
+                  {bill.status}
+                </Badge>
+              </div>
+
+              {/* Amount info */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Due</p>
+                  <p className="font-bold">{formatCurrency(billAmt)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Received</p>
+                  <p className={cn("font-bold", recAmt > 0 ? "text-success" : "text-muted-foreground")}>
+                    {formatCurrency(recAmt)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Date and allocation */}
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarDays size={12} />
+                  <span>{bill.tentativeBillingDate ? format(new Date(bill.tentativeBillingDate), 'MMM dd, yyyy') : 'N/A'}</span>
+                </div>
+                <span className="text-muted-foreground font-bold">{bill.billPercent}% alloc</span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-2">
+                {bill.status !== 'PAID' ? (
+                  <RecordPaymentDialog
+                    bill={bill}
+                    totalProjectValue={totalProjectVal}
+                    onSuccess={onRefresh}
+                  />
+                ) : (
+                  <div className="h-9 px-3 rounded-md bg-success/5 text-success text-xs font-bold flex items-center gap-1 border border-success/20">
+                    <CheckCircle2 size={12} /> SETTLED
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onProjectNavigate(bill.projectId);
+                  }}
+                >
+                  <ExternalLink size={14} className="mr-1" /> View
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-muted/50 text-[10px] font-black uppercase text-muted-foreground border-b border-border/50">
             <tr>
-              <th className="p-5">Milestone & Project</th>
-              <th className="p-5">Schedule Lifecycle</th>
-              <th className="p-5 text-center">Alloc %</th>
-              <th className="p-5">Financial Received</th>
-              <th className="p-5">Status</th>
+              <th className="p-5">
+                <SortableHeader label="Milestone & Project" sortKey="_projectName" currentSort={sortConfig} onSort={handleSort} />
+              </th>
+              <th className="p-5">
+                <SortableHeader label="Schedule" sortKey="_tentativeDate" currentSort={sortConfig} onSort={handleSort} />
+              </th>
+              <th className="p-5 text-center">
+                <SortableHeader label="Alloc %" sortKey="_billPercent" currentSort={sortConfig} onSort={handleSort} className="justify-center" />
+              </th>
+              <th className="p-5">
+                <SortableHeader label="Amount" sortKey="_billAmount" currentSort={sortConfig} onSort={handleSort} />
+              </th>
+              <th className="p-5">
+                <SortableHeader label="Status" sortKey="status" currentSort={sortConfig} onSort={handleSort} />
+              </th>
               <th className="p-5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {bills.map((bill) => {
+            {sortedData.map((bill) => {
               const totalProjectVal = Number(bill.project?.totalProjectValue || 0);
-              const recAmt = Number(bill.receivedAmount || 0);
-              const billAmt = Number(bill.billAmount || 0);
+              const recAmt = bill._receivedAmount;
+              const billAmt = bill._billAmount;
               const remaining = billAmt - recAmt;
               // All percentages are relative to TOTAL PROJECT VALUE (100%)
               const recPctOfProject = totalProjectVal > 0 ? ((recAmt / totalProjectVal) * 100).toFixed(2) : "0";

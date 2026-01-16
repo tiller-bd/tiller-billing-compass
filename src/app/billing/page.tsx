@@ -81,71 +81,73 @@ export default function BillingMasterPage() {
 
   return (
     <DashboardLayout title="Billing" >
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight uppercase">Billing & Collections</h1>
-            <p className="text-muted-foreground text-sm font-medium">Global milestone tracking and revenue received.</p>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex justify-between items-center gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-2xl font-black tracking-tight uppercase truncate">Billing & Collections</h1>
+            <p className="text-muted-foreground text-xs md:text-sm font-medium hidden sm:block">Global milestone tracking and revenue received.</p>
           </div>
           {/* New Button Layout: Refresh + New Bill Entry */}
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full">
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full h-9 w-9">
               <RefreshCw className={cn(loading && "animate-spin")} size={16} />
             </Button>
-            <AddBillDialog 
-              open={isAddBillOpen} 
-              setOpen={setIsAddBillOpen} 
-              onBillAdded={fetchBills} 
+            <AddBillDialog
+              open={isAddBillOpen}
+              setOpen={setIsAddBillOpen}
+              onBillAdded={fetchBills}
             />
           </div>
         </div>
 
-        {/* Filter Bar - Search is in header */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 glass-card rounded-2xl border-border/50 shadow-sm">
-          <Select value={project} onValueChange={setProject}>
-            <SelectTrigger className="bg-secondary/30 border-none h-11 font-bold">
-              <SelectValue placeholder="Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((p: any) => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.projectName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="bg-secondary/30 border-none h-11 font-bold">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="PARTIAL">Partial</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={dept} onValueChange={setDept}>
-            <SelectTrigger className="bg-secondary/30 border-none h-11 font-bold">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((d: any) => (
-                <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="bg-secondary/30 border-none h-11 font-bold">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              {[2024, 2025, 2026].map(y => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Filter Bar - Scrollable on mobile */}
+        <div className="glass-card rounded-2xl border-border/50 shadow-sm p-3 md:p-4 overflow-x-auto">
+          <div className="flex md:grid md:grid-cols-4 gap-2 md:gap-3 min-w-max md:min-w-0">
+            <Select value={project} onValueChange={setProject}>
+              <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-32 md:w-full text-xs md:text-sm">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {projects.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.projectName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-28 md:w-full text-xs md:text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="PAID">Paid</SelectItem>
+                <SelectItem value="PARTIAL">Partial</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={dept} onValueChange={setDept}>
+              <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-32 md:w-full text-xs md:text-sm">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d: any) => (
+                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-24 md:w-full text-xs md:text-sm">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {[2024, 2025, 2026].map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {loading ? (

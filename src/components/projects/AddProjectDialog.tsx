@@ -12,6 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  roundAmount,
+  calculatePercentage,
+  calculateAmountFromPercentage,
+  isApproximatelyEqual,
+} from "@/lib/financial-utils";
 
 interface AddProjectDialogProps {
   onProjectAdded: () => void;
@@ -58,16 +64,35 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   const { fields, remove, insert } = useFieldArray({ control, name: "bills" });
 
   const watchedBills = watch("bills");
-  const totalValue = parseFloat(watch("totalProjectValue") || "0");
+  // Use roundAmount for consistent integer handling
+  const totalValue = roundAmount(parseFloat(watch("totalProjectValue") || "0"));
 
   const totalPercentage = useMemo(() => {
     return watchedBills.reduce((sum, bill) => sum + parseFloat(bill.billPercent || "0"), 0);
   }, [watchedBills]);
 
-  const isPercentValid = ignoreTotalCheck || Math.abs(totalPercentage - 100) < 0.01;
+  // Calculate total of all bill amounts
+  const totalBillAmounts = useMemo(() => {
+    return watchedBills.reduce((sum, bill) => sum + roundAmount(parseFloat(bill.billAmount || "0")), 0);
+  }, [watchedBills]);
+
+  // Use epsilon tolerance for floating-point comparison (0.01% tolerance for 100% check)
+  const isPercentValid = ignoreTotalCheck || isApproximatelyEqual(totalPercentage, 100, 0.01);
   const percentDifference = 100 - totalPercentage;
-  const isOverAllocated = totalPercentage > 100;
-  const isUnderAllocated = totalPercentage < 100 && Math.abs(percentDifference) > 0.01;
+  const isOverAllocated = totalPercentage > 100 && !isApproximatelyEqual(totalPercentage, 100, 0.01);
+  const isUnderAllocated = totalPercentage < 100 && !isApproximatelyEqual(totalPercentage, 100, 0.01);
+
+  // Validate total amounts don't exceed project value
+  const amountDifference = totalValue - totalBillAmounts;
+  const isAmountValid = ignoreTotalCheck || totalBillAmounts <= totalValue;
+  const isAmountOverAllocated = totalBillAmounts > totalValue;
+
+  // Master validation: can only submit if ALL validations pass OR bypass is checked
+  const canSubmit = ignoreTotalCheck || (
+    isApproximatelyEqual(totalPercentage, 100, 0.01) &&
+    totalBillAmounts <= totalValue &&
+    !Object.values(amountErrors).some(error => error)
+  );
 
   // Load draft when dialog opens
   useEffect(() => {
@@ -134,8 +159,21 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     return true;
   };
 
+  // Handle percentage change - just update the value (no calculation on change)
   const handlePercentChange = (index: number, value: string) => {
-    let pct = parseFloat(value || "0");
+    setValue(`bills.${index}.billPercent`, value);
+  };
+
+  // Handle amount change - just update the value (no calculation on change)
+  const handleAmountChange = (index: number, value: string) => {
+    setValue(`bills.${index}.billAmount`, value);
+  };
+
+  // On blur of percentage field - calculate amount from percentage
+  const handlePercentBlur = (index: number) => {
+    let pct = parseFloat(watch(`bills.${index}.billPercent`) || "0");
+
+    // Clamp percentage to valid range
     if (pct > 100) {
       pct = 100;
       setValue(`bills.${index}.billPercent`, "100");
@@ -147,44 +185,51 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     }
 
     if (totalValue > 0) {
-      const amount = (pct / 100) * totalValue;
-      const roundedAmount = Math.round(amount).toString();
-      setValue(`bills.${index}.billAmount`, roundedAmount);
-      validateAmount(index, roundedAmount);
+      // Calculate amount from percentage
+      const amount = calculateAmountFromPercentage(pct, totalValue);
+      setValue(`bills.${index}.billAmount`, amount.toString());
+      // Recalculate percentage from the rounded amount to ensure consistency
+      const actualPercent = calculatePercentage(amount, totalValue);
+      setValue(`bills.${index}.billPercent`, actualPercent.toFixed(2));
+      validateAmount(index, amount.toString());
     }
   };
 
-  const handleAmountChange = (index: number, value: string) => {
-    const amt = parseFloat(value || "0");
+  // On blur of amount field - calculate percentage from amount
+  const handleAmountBlur = (index: number) => {
+    let amt = roundAmount(parseFloat(watch(`bills.${index}.billAmount`) || "0"));
 
     // Don't allow negative amounts
     if (amt < 0) {
+      amt = 0;
       setValue(`bills.${index}.billAmount`, "0");
+      setValue(`bills.${index}.billPercent`, "0");
       setAmountErrors(prev => ({ ...prev, [index]: false }));
       return;
     }
 
+    // Set the rounded amount
+    setValue(`bills.${index}.billAmount`, amt.toString());
+
     if (totalValue > 0) {
-      const percent = (amt / totalValue) * 100;
-      const roundedPercent = Math.min(100, Math.max(0, percent)).toFixed(2);
-      setValue(`bills.${index}.billPercent`, roundedPercent);
+      // Calculate percentage from amount
+      const percent = calculatePercentage(amt, totalValue);
+      setValue(`bills.${index}.billPercent`, percent.toFixed(2));
     }
 
-    validateAmount(index, value);
+    validateAmount(index, amt.toString());
   };
 
-  const handleAmountBlur = (index: number) => {
-    const amount = watch(`bills.${index}.billAmount`);
-    validateAmount(index, amount);
-  };
+  // On blur of total value - recalculate all amounts from their percentages
+  const handleTotalValueBlur = () => {
+    const total = roundAmount(parseFloat(watch("totalProjectValue") || "0"));
 
-  const handleTotalValueChange = (val: string) => {
-    const total = parseFloat(val || "0");
     watchedBills.forEach((bill, i) => {
-      const amt = (parseFloat(bill.billPercent || "0") / 100) * total;
-      const roundedAmount = Math.round(amt).toString();
-      setValue(`bills.${i}.billAmount`, roundedAmount);
-      validateAmount(i, roundedAmount);
+      const percent = parseFloat(bill.billPercent || "0");
+      // Recalculate amount from percentage using new total
+      const amount = calculateAmountFromPercentage(percent, total);
+      setValue(`bills.${i}.billAmount`, amount.toString());
+      validateAmount(i, amount.toString());
     });
   };
 
@@ -193,14 +238,14 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     const finalIndex = watchedBills.findIndex(b => b.billName.toLowerCase().includes("final"));
     const indexToInsert = finalIndex !== -1 ? finalIndex : watchedBills.length;
 
-    // Calculate default amount based on 5% of total value
-    const defaultPercent = "5";
-    const defaultAmount = totalValue > 0 ? Math.round((5 / 100) * totalValue).toString() : "0";
+    // Calculate default amount based on 5% of total value using financial utilities
+    const defaultPercent = 5;
+    const defaultAmount = totalValue > 0 ? calculateAmountFromPercentage(defaultPercent, totalValue) : 0;
 
     insert(indexToInsert, {
       billName: `Deliverable-${deliverableCount + 1}`,
-      billPercent: defaultPercent,
-      billAmount: defaultAmount,
+      billPercent: defaultPercent.toString(),
+      billAmount: defaultAmount.toString(),
       tentativeBillingDate: ""
     });
   };
@@ -229,9 +274,15 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       return;
     }
 
-    // Validate percentage only if bypass is NOT checked
-    if (!ignoreTotalCheck && Math.abs(totalPercentage - 100) > 0.01) {
+    // Validate percentage only if bypass is NOT checked (use epsilon tolerance)
+    if (!ignoreTotalCheck && !isApproximatelyEqual(totalPercentage, 100, 0.01)) {
       toast.error(`Invalid Allocation: Total is ${totalPercentage.toFixed(2)}%. It must be exactly 100%.`);
+      return;
+    }
+
+    // Validate total bill amounts don't exceed project value
+    if (!ignoreTotalCheck && totalBillAmounts > totalValue) {
+      toast.error(`Total bill amounts (৳${totalBillAmounts.toLocaleString('en-IN')}) exceed project value (৳${totalValue.toLocaleString('en-IN')})`);
       return;
     }
 
@@ -290,21 +341,26 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
   // Get status color and message for budget allocation
   const getAllocationStatus = () => {
+    // ALWAYS show actual values - never mislead
+    const actualPercentDisplay = `${totalPercentage.toFixed(2)}%`;
+    const actualAmountDisplay = `৳${totalBillAmounts.toLocaleString('en-IN')} / ৳${totalValue.toLocaleString('en-IN')}`;
+
     if (ignoreTotalCheck) {
       return {
         color: "info",
         icon: CheckCircle2,
-        message: "Budget Allocation",
-        description: "Guardrail bypassed"
+        message: "Bypass Active",
+        description: `${actualPercentDisplay} • ${actualAmountDisplay}`
       };
     }
 
-    if (isPercentValid) {
+    // Check amounts first - this is more critical
+    if (isAmountOverAllocated) {
       return {
-        color: "success",
-        icon: CheckCircle2,
-        message: "Perfect Allocation",
-        description: "100% allocated"
+        color: "danger",
+        icon: AlertCircle,
+        message: "AMOUNT EXCEEDS TOTAL",
+        description: `${actualPercentDisplay} • Exceeds by ৳${Math.abs(amountDifference).toLocaleString('en-IN')}`
       };
     }
 
@@ -312,16 +368,36 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       return {
         color: "danger",
         icon: AlertCircle,
-        message: "Over-Allocated",
-        description: `Exceeded by ${Math.abs(percentDifference).toFixed(2)}%`
+        message: "OVER-ALLOCATED",
+        description: `${actualPercentDisplay} • Exceeded by ${Math.abs(percentDifference).toFixed(2)}%`
       };
     }
 
+    if (isUnderAllocated) {
+      return {
+        color: "warning",
+        icon: AlertTriangle,
+        message: "UNDER-ALLOCATED",
+        description: `${actualPercentDisplay} • ${Math.abs(percentDifference).toFixed(2)}% remaining`
+      };
+    }
+
+    // Only show success if BOTH percentage AND amount are valid
+    if (isApproximatelyEqual(totalPercentage, 100, 0.01) && totalBillAmounts <= totalValue) {
+      return {
+        color: "success",
+        icon: CheckCircle2,
+        message: "Perfect Allocation",
+        description: `${actualPercentDisplay} • ${actualAmountDisplay}`
+      };
+    }
+
+    // Fallback - should not reach here
     return {
       color: "warning",
       icon: AlertTriangle,
-      message: "Under-Allocated",
-      description: `${percentDifference.toFixed(2)}% remaining`
+      message: "Check Allocation",
+      description: `${actualPercentDisplay} • ${actualAmountDisplay}`
     };
   };
 
@@ -351,11 +427,12 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Total Project Valuation (BDT)</Label>
               <Input
                 type="number"
-                {...register("totalProjectValue")}
+                value={watch("totalProjectValue") || ""}
                 placeholder="0"
                 className="h-11 font-black text-primary text-lg bg-primary/5"
                 required
-                onChange={(e) => handleTotalValueChange(e.target.value)}
+                onChange={(e) => setValue("totalProjectValue", e.target.value)}
+                onBlur={handleTotalValueBlur}
               />
             </div>
           </div>
@@ -453,9 +530,11 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                       step="0.01"
                       min="0"
                       max="100"
-                      {...register(`bills.${index}.billPercent`)}
+                      value={watch(`bills.${index}.billPercent`) || ""}
                       className="font-black text-primary"
                       onChange={(e) => handlePercentChange(index, e.target.value)}
+                      onBlur={() => handlePercentBlur(index)}
+                      required
                     />
                   </div>
 
@@ -469,7 +548,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                     <Input
                       type="number"
                       min="0"
-                      {...register(`bills.${index}.billAmount`)}
+                      value={watch(`bills.${index}.billAmount`) || ""}
                       className={cn(
                         "font-bold",
                         amountErrors[index] && "border-red-500 focus-visible:ring-red-500"
@@ -505,7 +584,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                 <allocationStatus.icon className="w-5 h-5" />
                 <div>
                   <div className="text-sm font-black uppercase">{allocationStatus.message}</div>
-                  <div className="text-xs font-bold opacity-80">{totalPercentage.toFixed(2)}% • {allocationStatus.description}</div>
+                  <div className="text-xs font-bold opacity-80">{allocationStatus.description}</div>
                 </div>
               </div>
               {ignoreTotalCheck && (
@@ -528,8 +607,21 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
             >
               Clear Draft
             </Button>
-            <Button type="submit" className="flex-1 h-14 text-lg font-black uppercase tracking-widest" disabled={loading}>
-              {loading ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : "Authorize Project Creation"}
+            <Button
+              type="submit"
+              className="flex-1 h-14 text-lg font-black uppercase tracking-widest"
+              disabled={loading || !canSubmit}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : !canSubmit ? (
+                "Fix Validation Errors"
+              ) : (
+                "Authorize Project Creation"
+              )}
             </Button>
           </div>
         </form>

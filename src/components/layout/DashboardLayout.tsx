@@ -4,6 +4,7 @@
 import { useState, ReactNode, createContext, useContext, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { MobileNav } from './MobileNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
@@ -74,17 +75,19 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
           )}
         </AnimatePresence>
 
-        {/* Persistent Sidebar */}
-        <Sidebar />
+        {/* Persistent Sidebar - Hidden on mobile */}
+        <div className="hidden md:block">
+          <Sidebar />
+        </div>
 
-        {/* Main Content Area - Changed structure */}
+        {/* Main Content Area */}
         <motion.div
           initial={false}
           animate={{
             marginLeft: collapsed ? '80px' : '280px',
           }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="flex-1 flex flex-col min-w-0 min-h-screen"
+          className="hidden md:flex flex-1 flex-col min-w-0 min-h-screen"
         >
           {/* Fixed Header - Outside scrollable area */}
           <div className="sticky top-0 z-40">
@@ -107,6 +110,32 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
             </AnimatePresence>
           </main>
         </motion.div>
+
+        {/* Mobile Layout */}
+        <div className="flex md:hidden flex-1 flex-col min-w-0 min-h-screen">
+          {/* Mobile Header */}
+          <div className="sticky top-0 z-40">
+            <Header title={title} />
+          </div>
+
+          {/* Mobile Content - with bottom padding for nav */}
+          <main className="flex-1 p-4 pb-24 overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+
+          {/* Mobile Bottom Navigation */}
+          <MobileNav />
+        </div>
       </div>
     </SidebarContext.Provider>
   );

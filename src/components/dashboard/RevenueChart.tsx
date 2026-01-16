@@ -14,11 +14,9 @@ interface RevenueChartProps {
 
 export function RevenueChart({ data, loading, isExpanded }: RevenueChartProps) {
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency',
-      currency: 'BDT',
-      maximumFractionDigits: 0,
-    }).format(value);
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value));
+    return `৳${formatted}`;
   };
 
   return (
@@ -49,7 +47,7 @@ export function RevenueChart({ data, loading, isExpanded }: RevenueChartProps) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" vertical={false} />
               <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }} tickFormatter={(val) => `৳${(val / 1000).toFixed(0)}k`} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }} tickFormatter={(val) => `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(val)}`} />
               <Tooltip
                 formatter={(value: number) => [formatCurrency(value), 'Received']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid hsl(214, 20%, 88%)' }}

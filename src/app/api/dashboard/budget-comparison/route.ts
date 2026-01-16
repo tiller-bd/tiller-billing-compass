@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
       return {
         // Shorten long names for chart readability
         name: p.projectName.length > 15 ? p.projectName.substring(0, 15) + '...' : p.projectName,
-        received: received / 1000000, // Amount in Millions
-        remaining: remaining / 1000000, // Amount in Millions
+        received, // Full amount
+        remaining, // Full amount
       };
     });
 

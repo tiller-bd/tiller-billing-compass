@@ -201,21 +201,19 @@ export default function DashboardPage() {
   }, [selectedYear, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency',
-      currency: 'BDT',
-      maximumFractionDigits: 0,
-    }).format(amount);
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
   };
 
   return (
     <DashboardLayout title="Dashboard" >
 
-      {/* Expanded View Modal */}
+      {/* Expanded View Modal - Full screen on mobile */}
       {expandedCard && (
-        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-card border w-full max-w-6xl h-[80vh] rounded-xl shadow-2xl relative p-8">
-            <Button variant="ghost" size="icon" className="absolute top-4 right-4" onClick={() => setExpandedCard(null)}>
+        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
+          <div className="bg-card border w-full max-w-6xl h-[90vh] md:h-[80vh] rounded-xl shadow-2xl relative p-4 md:p-8">
+            <Button variant="ghost" size="icon" className="absolute top-2 right-2 md:top-4 md:right-4" onClick={() => setExpandedCard(null)}>
               <X className="h-5 w-5" />
             </Button>
             {expandedCard === 'revenue' && <RevenueChart data={revenue} isExpanded />}
@@ -227,53 +225,54 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="space-y-6" data-testid="dashboard-page-content">
+      <div className="space-y-4 md:space-y-6" data-testid="dashboard-page-content">
         <DashboardFilter />
-        {/* Top Metric Cards - Refetch Only */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Top Metric Cards - 2x2 grid on mobile, 4 cols on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 h-7 w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
             <MetricCard loading={loadingStates.metrics} title="Total Budget" value={formatCurrency(metrics?.totalBudget || 0)} icon={Wallet} variant="primary" />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 h-7 w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
             <MetricCard loading={loadingStates.metrics} title="Total Received" value={formatCurrency(metrics?.totalReceived || 0)} icon={TrendingUp} variant="success" />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 h-7 w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
             <MetricCard loading={loadingStates.metrics} title="Total Remaining" value={formatCurrency(metrics?.totalRemaining || 0)} icon={TrendingDown} variant="warning" />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 h-7 w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
             <MetricCard loading={loadingStates.metrics} title="Active Projects" value={metrics?.activeCount?.toString() || "0"} icon={FolderKanban} />
           </div>
         </div>
 
         <Tabs defaultValue="charts">
-          <TabsList className="glass-card mb-4">
-            <TabsTrigger value="charts">Charts Overview</TabsTrigger>
-            <TabsTrigger value="projects">All Projects</TabsTrigger>
+          <TabsList className="glass-card mb-4 w-full md:w-auto">
+            <TabsTrigger value="charts" className="flex-1 md:flex-none text-xs md:text-sm">Charts</TabsTrigger>
+            <TabsTrigger value="projects" className="flex-1 md:flex-none text-xs md:text-sm">Projects</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="charts" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TabsContent value="charts" className="space-y-4 md:space-y-6">
+            {/* Revenue & Budget Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fetchRevenue(selectedYear)}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('revenue')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('revenue')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
-                <div className="absolute top-4 right-16 z-20 flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Year:</span>
+                <div className="absolute top-3 right-12 md:top-4 md:right-16 z-20 flex items-center gap-1 md:gap-2">
+                  <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">Year:</span>
                   <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="h-8 w-24 bg-background/50 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-7 w-20 md:h-8 md:w-24 bg-background/50 text-[10px] md:text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {[2024, 2025, 2026].map(year => <SelectItem key={year} value={year.toString()}>{year}</SelectItem>)}
                     </SelectContent>
@@ -285,34 +284,32 @@ export default function DashboardPage() {
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchBudgetComparison}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('budget')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('budget')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
                 <BudgetComparisonChart loading={loadingStates.budget} data={budgetComparison} />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="relative group col-span-2">
+            {/* Distribution, Last Received, Deadlines */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              <div className="relative group md:col-span-2 lg:col-span-2">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDistribution}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('distribution')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('distribution')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
-                <div className=''>
-                  <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
-                </div>
-
+                <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
               </div>
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchLastReceived}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('lastReceived')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('lastReceived')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
                 <LastReceived loading={loadingStates.lastReceived} data={lastReceived} />
               </div>
-              <div className="relative group">
+              <div className="relative group md:col-span-2 lg:col-span-3">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDeadlines}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCard('deadlines')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('deadlines')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
                 <UpcomingDeadlines loading={loadingStates.deadlines} deadlines={deadlines} />
               </div>

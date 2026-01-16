@@ -73,11 +73,9 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   );
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency',
-      currency: 'BDT',
-      maximumFractionDigits: 0,
-    }).format(value);
+    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value));
+    return `৳${formatted}`;
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
