@@ -13,10 +13,11 @@ interface Option {
 }
 
 export function DashboardFilter() {
-  const { 
-    departmentId, setDepartmentId, 
-    clientId, setClientId, 
+  const {
+    departmentId, setDepartmentId,
+    clientId, setClientId,
     projectId, setProjectId,
+    selectedYear, setSelectedYear,
     resetFilters,
     selectedFilter,
     setSelectedFilter,
@@ -28,6 +29,19 @@ export function DashboardFilter() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Generate year options from 2024 to current year
+  const generateYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const startYear = 2024;
+    const years = [];
+    for (let year = currentYear; year >= startYear; year--) {
+      years.push(year.toString());
+    }
+    return years;
+  };
+
+  const yearOptions = generateYearOptions();
 
   useEffect(() => {
     async function fetchData() {
@@ -158,6 +172,23 @@ export function DashboardFilter() {
               <SelectItem value="all">All Projects</SelectItem>
               {projects.map((proj) => (
                 <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="year-filter" className="sr-only">Filter by Year</Label>
+          <Select
+            value={selectedYear}
+            onValueChange={setSelectedYear}
+          >
+            <SelectTrigger className="w-[100px] md:w-[120px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={year}>{year}</SelectItem>
               ))}
             </SelectContent>
           </Select>

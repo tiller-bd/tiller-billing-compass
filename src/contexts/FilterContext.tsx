@@ -18,6 +18,8 @@ interface FilterContextType {
   setClientId: (id: string) => void;
   projectId: string;
   setProjectId: (id: string) => void;
+  selectedYear: string;
+  setSelectedYear: (year: string) => void;
   selectedFilter: Suggestion | null;
   setSelectedFilter: (filter: Suggestion | null) => void;
   resetFilters: () => void;
@@ -30,6 +32,7 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
   const [departmentId, setDepartmentId] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [projectId, setProjectId] = useState('all');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedFilter, setSelectedFilter] = useState<Suggestion | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
@@ -39,20 +42,23 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
     setDepartmentId('all');
     setClientId('all');
     setProjectId('all');
+    setSelectedYear(new Date().getFullYear().toString());
     setSelectedFilter(null);
   };
 
   return (
-    <FilterContext.Provider value={{ 
-      search, 
-      setSearch, 
+    <FilterContext.Provider value={{
+      search,
+      setSearch,
       debouncedSearch,
-      departmentId, 
+      departmentId,
       setDepartmentId,
       clientId,
       setClientId,
       projectId,
       setProjectId,
+      selectedYear,
+      setSelectedYear,
       selectedFilter,
       setSelectedFilter,
       resetFilters

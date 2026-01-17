@@ -11,7 +11,6 @@ import { UpcomingDeadlines } from '@/components/dashboard/UpcomingDeadlines';
 import { LastReceived } from '@/components/dashboard/LastReceived';
 import { ProjectTable } from '@/components/projects/ProjectTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useSharedFilters } from '@/contexts/FilterContext';
 import { DashboardFilter } from '@/components/dashboard/DashboardFilter';
@@ -27,8 +26,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
-  const { departmentId, clientId, projectId } = useSharedFilters();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const { departmentId, clientId, projectId, selectedYear } = useSharedFilters();
 
   // Individual Loading States for Refetching
   const [loadingStates, setLoadingStates] = useState({
@@ -268,15 +266,6 @@ export default function DashboardPage() {
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fetchRevenue(selectedYear)}><RefreshCw className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('revenue')}><Maximize2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                <div className="absolute top-3 right-12 md:top-4 md:right-16 z-20 flex items-center gap-1 md:gap-2">
-                  <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">Year:</span>
-                  <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="h-7 w-20 md:h-8 md:w-24 bg-background/50 text-[10px] md:text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[2024, 2025, 2026].map(year => <SelectItem key={year} value={year.toString()}>{year}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
                 </div>
                 <RevenueChart loading={loadingStates.revenue} data={revenue} />
               </div>

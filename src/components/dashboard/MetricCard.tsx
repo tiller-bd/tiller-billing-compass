@@ -23,12 +23,12 @@ export function MetricCard({
   if (loading) {
     return (
       <div className="glass-card rounded-xl p-3 md:p-6 glow-effect h-[100px] md:h-[128px]">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2 md:space-y-3">
-            <Skeleton className="h-3 md:h-4 w-16 md:w-24" />
-            <Skeleton className="h-6 md:h-8 w-20 md:w-32" />
+        <div className="flex flex-col h-full">
+          <div className="flex items-center gap-2 mb-2 md:mb-3">
+            <Skeleton className="h-8 w-8 md:h-10 md:w-10 rounded-lg" />
+            <Skeleton className="h-3 md:h-4 w-20 md:w-28" />
           </div>
-          <Skeleton className="h-9 w-9 md:h-12 md:w-12 rounded-lg" />
+          <Skeleton className="h-6 md:h-8 w-24 md:w-36 mt-auto" />
         </div>
       </div>
     );
@@ -41,34 +41,34 @@ export function MetricCard({
       transition={{ duration: 0.5 }}
       className="glass-card rounded-xl p-3 md:p-6 glow-effect h-[100px] md:h-[128px]"
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-0.5 md:space-y-1 min-w-0 flex-1 pr-2">
-          <p className="text-[10px] md:text-sm text-muted-foreground font-medium truncate">{title}</p>
-          <p className={cn(
-            "text-base md:text-2xl font-bold tracking-tight truncate",
-            variant === 'primary' && "stat-value",
-            variant === 'success' && "text-success",
-            variant === 'warning' && "text-warning",
-            variant === 'default' && "text-foreground"
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 mb-2 md:mb-3">
+          <div className={cn(
+            "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center shrink-0",
+            variant === 'primary' && "bg-primary/20",
+            variant === 'success' && "bg-success/20",
+            variant === 'warning' && "bg-warning/20",
+            variant === 'default' && "bg-muted"
           )}>
-            {value}
-          </p>
+            <Icon className={cn(
+              "w-4 h-4 md:w-5 md:h-5",
+              variant === 'primary' && "text-primary",
+              variant === 'success' && "text-success",
+              variant === 'warning' && "text-warning",
+              variant === 'default' && "text-muted-foreground"
+            )} />
+          </div>
+          <p className="text-[10px] md:text-sm text-muted-foreground font-medium truncate">{title}</p>
         </div>
-        <div className={cn(
-          "w-9 h-9 md:w-12 md:h-12 rounded-lg flex items-center justify-center shrink-0",
-          variant === 'primary' && "bg-primary/20",
-          variant === 'success' && "bg-success/20",
-          variant === 'warning' && "bg-warning/20",
-          variant === 'default' && "bg-muted"
+        <p className={cn(
+          "text-base md:text-2xl font-bold tracking-tight mt-auto",
+          variant === 'primary' && "stat-value",
+          variant === 'success' && "text-success",
+          variant === 'warning' && "text-warning",
+          variant === 'default' && "text-foreground"
         )}>
-          <Icon className={cn(
-            "w-4 h-4 md:w-6 md:h-6",
-            variant === 'primary' && "text-primary",
-            variant === 'success' && "text-success",
-            variant === 'warning' && "text-warning",
-            variant === 'default' && "text-muted-foreground"
-          )} />
-        </div>
+          {value}
+        </p>
       </div>
     </motion.div>
   );
