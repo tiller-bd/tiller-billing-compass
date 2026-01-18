@@ -85,7 +85,7 @@ export function AddClientDialog({
           <Plus className="w-4 h-4" /> Add Client
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" /> Register New Client

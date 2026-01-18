@@ -1,12 +1,18 @@
 /**
  * Financial Calculation Utilities
- * 
- * Core Principle: AMOUNT IS THE SOURCE OF TRUTH
- * - All amounts are stored as integers (smallest currency unit)
- * - Percentages are always derived from amounts
- * - When user enters percentage, convert to amount first, then recalculate percentage
+ *
+ * Core Principle: HIGH PRECISION STORAGE, FORMATTED DISPLAY
+ * - All amounts are stored with 12 decimal places precision for calculations
+ * - Display uses max 4 decimal places
+ * - Percentages are calculated with full precision
  * - Use epsilon tolerance for floating-point comparisons
  */
+
+// Storage precision: 12 decimal places for calculations
+const STORAGE_PRECISION = 12;
+
+// Display precision: max 4 decimal places for showing to user
+const DISPLAY_PRECISION = 4;
 
 // Small tolerance for floating-point comparisons (0.0001%)
 const EPSILON = 0.0001;
@@ -20,29 +26,50 @@ export function roundTo(value: number, decimals: number): number {
 }
 
 /**
- * Rounds amount to nearest integer (for BDT)
+ * Rounds amount to storage precision (12 decimals)
+ * Used for all internal calculations and storage
  */
 export function roundAmount(amount: number): number {
-  return Math.round(amount);
+  return roundTo(amount, STORAGE_PRECISION);
 }
 
 /**
- * Calculates percentage with proper precision handling
- * Returns percentage with specified decimal places
+ * Formats amount for display with max 4 decimal places
+ * Strips trailing zeros
  */
-export function calculatePercentage(amount: number, total: number, decimals: number = 2): number {
+export function displayAmount(amount: number): string {
+  const rounded = roundTo(amount, DISPLAY_PRECISION);
+  // Remove trailing zeros
+  return rounded.toString().replace(/\.?0+$/, '');
+}
+
+/**
+ * Calculates percentage with full precision (12 decimals) for storage
+ * Use for internal calculations
+ */
+export function calculatePercentage(amount: number, total: number, decimals: number = STORAGE_PRECISION): number {
   if (total === 0) return 0;
   const percentage = (amount / total) * 100;
   return roundTo(percentage, decimals);
 }
 
 /**
- * Calculates amount from percentage with proper rounding
- * Always returns an integer amount
+ * Calculates amount from percentage with 12 decimal precision
+ * Returns amount with full precision for calculations
  */
 export function calculateAmountFromPercentage(percentage: number, total: number): number {
   const amount = (percentage / 100) * total;
   return roundAmount(amount);
+}
+
+/**
+ * Formats percentage for display with max 4 decimal places
+ * Strips trailing zeros
+ */
+export function displayPercentage(percentage: number): string {
+  const rounded = roundTo(percentage, DISPLAY_PRECISION);
+  // Remove trailing zeros
+  return rounded.toString().replace(/\.?0+$/, '');
 }
 
 /**
@@ -61,25 +88,22 @@ export function isLessOrApproximatelyEqual(value: number, max: number, epsilon: 
 }
 
 /**
- * For display: Rounds percentage UP to show user-friendly value
- * Example: 0.10999978 -> 0.11
+ * Calculates and displays percentage from amount and total
+ * Uses max 4 decimal places, strips trailing zeros
  */
-export function displayPercentage(amount: number, total: number, decimals: number = 2): string {
+export function displayPercentageFromAmount(amount: number, total: number): string {
   if (total === 0) return "0";
   const percentage = (amount / total) * 100;
-  return roundTo(percentage, decimals).toFixed(decimals);
+  return displayPercentage(percentage);
 }
 
 /**
- * For validation max: Rounds percentage UP (ceiling) to prevent precision issues
- * This ensures user can always enter the displayed percentage
+ * For validation max: Rounds percentage with storage precision
  */
-export function maxPercentageForValidation(amount: number, total: number, decimals: number = 2): number {
+export function maxPercentageForValidation(amount: number, total: number): number {
   if (total === 0) return 0;
   const percentage = (amount / total) * 100;
-  // Round UP to the next decimal place to account for display rounding
-  const factor = Math.pow(10, decimals);
-  return Math.ceil(percentage * factor) / factor;
+  return roundTo(percentage, STORAGE_PRECISION);
 }
 
 /**
@@ -146,26 +170,30 @@ export function validatePercentageInput(
 /**
  * Formats currency for display (BDT) with Indian/Bangladeshi numbering system
  * Uses Lakh/Crore notation: 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
- * NO compact notation (K/M) - always shows full numbers
+ * Shows max 4 decimal places when decimals exist
  */
-export function formatBDT(amount: number): string {
+export function formatBDT(amount: number, showDecimals: boolean = false): string {
   // Use en-IN locale for Indian numbering system (Lakh/Crore commas)
   // Format: 1,00,00,000 (1 crore), 1,00,000 (1 lakh)
+  const rounded = roundTo(amount, showDecimals ? DISPLAY_PRECISION : 0);
   const formatted = new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 0
-  }).format(Math.round(amount));
+    minimumFractionDigits: 0,
+    maximumFractionDigits: showDecimals ? DISPLAY_PRECISION : 0
+  }).format(rounded);
 
   return `৳${formatted}`;
 }
 
 /**
  * Formats a plain number with Indian/Bangladeshi numbering system
- * Uses Lakh/Crore notation: 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
+ * Shows max 4 decimal places when decimals exist
  */
-export function formatIndianNumber(num: number): string {
+export function formatIndianNumber(num: number, showDecimals: boolean = false): string {
+  const rounded = roundTo(num, showDecimals ? DISPLAY_PRECISION : 0);
   return new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 0
-  }).format(Math.round(num));
+    minimumFractionDigits: 0,
+    maximumFractionDigits: showDecimals ? DISPLAY_PRECISION : 0
+  }).format(rounded);
 }
 
 /**

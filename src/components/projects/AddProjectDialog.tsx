@@ -41,6 +41,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   const [amountErrors, setAmountErrors] = useState<Record<number, boolean>>({});
   const [pgEnabled, setPgEnabled] = useState(false);
   const [pgInputType, setPgInputType] = useState<'percentage' | 'amount'>('percentage');
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
   // Use controlled state if provided, otherwise fallback to local state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -562,23 +563,51 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     }
   };
 
+  // Check if form has meaningful data
+  const hasFormData = () => {
+    const formData = getValues();
+    return !!(
+      formData.projectName?.trim() ||
+      formData.totalProjectValue ||
+      formData.clientId ||
+      formData.departmentId ||
+      formData.categoryId ||
+      (formData.bills && formData.bills.some(b => b.billName || b.billAmount || b.billPercent))
+    );
+  };
+
   const handleDialogClose = (newOpen: boolean) => {
-    if (!newOpen) {
-      // Save draft when closing
-      const formData = getValues();
-      const draftData = {
-        ...formData,
-        ignoreTotalCheck,
-        isNewClient,
-        isNewCategory,
-        isNewDepartment,
-        pgEnabled,
-        pgInputType
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-      toast.info("Draft saved automatically");
+    if (!newOpen && hasFormData()) {
+      // Show confirmation if there's data
+      setShowCloseConfirmation(true);
+    } else if (!newOpen) {
+      // No data, just close
+      setOpen(false);
+    } else {
+      setOpen(newOpen);
     }
-    setOpen(newOpen);
+  };
+
+  const confirmClose = () => {
+    // Save draft when closing
+    const formData = getValues();
+    const draftData = {
+      ...formData,
+      ignoreTotalCheck,
+      isNewClient,
+      isNewCategory,
+      isNewDepartment,
+      pgEnabled,
+      pgInputType
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+    toast.info("Draft saved automatically");
+    setShowCloseConfirmation(false);
+    setOpen(false);
+  };
+
+  const cancelClose = () => {
+    setShowCloseConfirmation(false);
   };
 
   // Get status color and message for budget allocation
@@ -651,13 +680,28 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogClose}>
-      <DialogTrigger asChild>
-        <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all">
-          <Plus className="w-4 h-4" /> Create New Project
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+    <>
+      <Dialog open={open} onOpenChange={handleDialogClose}>
+        <DialogTrigger asChild>
+          <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all">
+            <Plus className="w-4 h-4" /> Create New Project
+          </Button>
+        </DialogTrigger>
+        <DialogContent
+          className="max-w-5xl max-h-[95vh] overflow-y-auto"
+          // onInteractOutside={(e) => {
+          //   e.preventDefault();
+          //   if (hasFormData()) {
+          //     setShowCloseConfirmation(true);
+          //   }
+          // }}
+          // onEscapeKeyDown={(e) => {
+          //   e.preventDefault();
+          //   if (hasFormData()) {
+          //     setShowCloseConfirmation(true);
+          //   }
+          // }}
+        >
         <DialogHeader>
           <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
             <CheckCircle2 className="w-6 h-6 text-primary" /> Project Authorization
@@ -1117,7 +1161,42 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Confirmation Dialog */}
+      <Dialog open={showCloseConfirmation} onOpenChange={cancelClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" /> Confirm Close
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              You have unsaved changes in this form. Closing will save your progress as a draft.
+            </p>
+            <p className="text-xs text-muted-foreground font-bold">
+              Your draft will be automatically loaded when you reopen this dialog.
+            </p>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={cancelClose}
+              className="font-bold"
+            >
+              Continue Editing
+            </Button>
+            <Button
+              onClick={confirmClose}
+              className="font-bold bg-amber-500 hover:bg-amber-600"
+            >
+              Close & Save Draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

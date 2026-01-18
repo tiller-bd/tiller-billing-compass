@@ -9,6 +9,7 @@ import { ProjectDistributionChart } from '@/components/dashboard/ProjectDistribu
 import { BudgetComparisonChart } from '@/components/dashboard/BudgetComparisonChart';
 import { UpcomingDeadlines } from '@/components/dashboard/UpcomingDeadlines';
 import { LastReceived } from '@/components/dashboard/LastReceived';
+import { CalendarCard } from '@/components/dashboard/CalendarCard';
 import { ProjectTable } from '@/components/projects/ProjectTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [budgetComparison, setBudgetComparison] = useState([]);
   const [lastReceived, setLastReceived] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
@@ -36,6 +38,7 @@ export default function DashboardPage() {
     budget: true,
     lastReceived: true,
     deadlines: true,
+    calendar: true,
     projects: true
   });
 
@@ -47,6 +50,7 @@ export default function DashboardPage() {
     budget: ApiClientError | null;
     lastReceived: ApiClientError | null;
     deadlines: ApiClientError | null;
+    calendar: ApiClientError | null;
     projects: ApiClientError | null;
   }>({
     metrics: null,
@@ -55,6 +59,7 @@ export default function DashboardPage() {
     budget: null,
     lastReceived: null,
     deadlines: null,
+    calendar: null,
     projects: null
   });
 
@@ -171,6 +176,22 @@ export default function DashboardPage() {
     }
   }, [departmentId, clientId, projectId]);
 
+  const fetchCalendar = useCallback(async () => {
+    updateLoading('calendar', true);
+    updateError('calendar', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/calendar?${params}`);
+      setCalendarEvents(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('calendar', err);
+      }
+    } finally {
+      updateLoading('calendar', false);
+    }
+  }, [departmentId, clientId, projectId]);
+
   const fetchProjects = useCallback(async () => {
     updateLoading('projects', true);
     updateError('projects', null);
@@ -195,8 +216,9 @@ export default function DashboardPage() {
     fetchBudgetComparison();
     fetchLastReceived();
     fetchDeadlines();
+    fetchCalendar();
     fetchProjects();
-  }, [selectedYear, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchProjects]);
+  }, [selectedYear, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
@@ -219,6 +241,7 @@ export default function DashboardPage() {
             {expandedCard === 'distribution' && <ProjectDistributionChart data={distribution} isExpanded />}
             {expandedCard === 'lastReceived' && <LastReceived data={lastReceived} isExpanded />}
             {expandedCard === 'deadlines' && <UpcomingDeadlines deadlines={deadlines} isExpanded />}
+            {expandedCard === 'calendar' && <CalendarCard events={calendarEvents} isExpanded />}
           </div>
         </div>
       )}
@@ -345,12 +368,19 @@ export default function DashboardPage() {
                 </div>
                 <LastReceived loading={loadingStates.lastReceived} data={lastReceived} />
               </div>
-              <div className="relative group md:col-span-2 lg:col-span-3">
+              <div className="relative group md:col-span-2 lg:col-span-1">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDeadlines}><RefreshCw className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('deadlines')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
                 <UpcomingDeadlines loading={loadingStates.deadlines} deadlines={deadlines} />
+              </div>
+              <div className="relative group md:col-span-2 lg:col-span-2">
+                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchCalendar}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('calendar')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                </div>
+                <CalendarCard loading={loadingStates.calendar} events={calendarEvents} />
               </div>
             </div>
           </TabsContent>

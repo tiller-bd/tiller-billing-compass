@@ -3,10 +3,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, Wallet, TrendingDown, FolderKanban, Shield } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProjectTable, ProjectTableSkeleton } from '@/components/projects/ProjectTable';
 import { AddProjectDialog } from '@/components/projects/AddProjectDialog';
+import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
@@ -79,6 +80,53 @@ export default function ProjectsPage() {
     return () => clearTimeout(timer);
   }, [fetchProjects]);
 
+  // Calculate metrics from filtered projects
+  const metrics = useMemo(() => {
+    const totalBudget = projects.reduce((sum, p) => sum + Number(p.totalProjectValue || 0), 0);
+    const totalReceived = projects.reduce((sum, p) => {
+      const received = p.bills?.filter((b: any) => b.status === 'PAID')
+        .reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0) || 0;
+      return sum + received;
+    }, 0);
+    const totalRemaining = totalBudget - totalReceived;
+    const activeCount = projects.filter(p => {
+      const hasUnpaidBills = p.bills?.some((b: any) => b.status !== 'PAID');
+      return hasUnpaidBills;
+    }).length;
+
+    // PG Metrics
+    const pgDeposited = projects.reduce((sum, p) => {
+      if (p.pgStatus === 'PENDING' || p.pgStatus === 'CLEARED') {
+        return sum + Number(p.pgUserDeposit || 0);
+      }
+      return sum;
+    }, 0);
+
+    const pgCleared = projects.reduce((sum, p) => {
+      if (p.pgStatus === 'CLEARED') {
+        return sum + Number(p.pgUserDeposit || 0);
+      }
+      return sum;
+    }, 0);
+
+    const pgPending = projects.reduce((sum, p) => {
+      if (p.pgStatus === 'PENDING') {
+        return sum + Number(p.pgUserDeposit || 0);
+      }
+      return sum;
+    }, 0);
+
+    return {
+      totalBudget,
+      totalReceived,
+      totalRemaining,
+      activeCount,
+      pgDeposited,
+      pgCleared,
+      pgPending,
+    };
+  }, [projects]);
+
   const chartData = useMemo(() => {
     const received = projects.slice(0, 10).map((p: any) => {
       const rec = p.bills.reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
@@ -100,6 +148,13 @@ export default function ProjectsPage() {
     return { received, trend };
   }, [projects]);
 
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
+  };
+
+  const hasPgData = metrics.pgDeposited > 0 || metrics.pgCleared > 0 || metrics.pgPending > 0;
+
   return (
     <DashboardLayout title="Projects" >
       <div className="space-y-4 md:space-y-6">
@@ -109,7 +164,6 @@ export default function ProjectsPage() {
             <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading} className="h-9 w-9">
               <RefreshCw className={loading ? "animate-spin" : ""} size={16} />
             </Button>
-            {/* Controlled AddProjectDialog */}
             <AddProjectDialog
               open={isAddProjectOpen}
               setOpen={setIsAddProjectOpen}
@@ -117,6 +171,84 @@ export default function ProjectsPage() {
             />
           </div>
         </div>
+
+        {/* Summary Metrics - Similar to Dashboard */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="relative group">
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </Button>
+            <MetricCard loading={loading} title="Total Budget" value={formatCurrency(metrics.totalBudget)} icon={Wallet} variant="primary" />
+          </div>
+          <div className="relative group">
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </Button>
+            <MetricCard loading={loading} title="Total Received" value={formatCurrency(metrics.totalReceived)} icon={TrendingUp} variant="success" />
+          </div>
+          <div className="relative group">
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </Button>
+            <MetricCard loading={loading} title="Total Remaining" value={formatCurrency(metrics.totalRemaining)} icon={TrendingDown} variant="warning" />
+          </div>
+          <div className="relative group">
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </Button>
+            <MetricCard loading={loading} title="Active Projects" value={metrics.activeCount.toString()} icon={FolderKanban} />
+          </div>
+        </div>
+
+        {/* PG Metrics - Conditional Display */}
+        {hasPgData && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <Shield className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+              <h3 className="text-xs md:text-sm font-black uppercase tracking-wider text-muted-foreground">
+                Project Guarantee (PG) Overview
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loading}
+                  title="PG Deposited"
+                  value={formatCurrency(metrics.pgDeposited)}
+                  icon={Shield}
+                  variant="default"
+                />
+              </div>
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loading}
+                  title="PG Cleared"
+                  value={formatCurrency(metrics.pgCleared)}
+                  icon={TrendingUp}
+                  variant="success"
+                />
+              </div>
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loading}
+                  title="PG Pending"
+                  value={formatCurrency(metrics.pgPending)}
+                  icon={TrendingDown}
+                  variant="warning"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filter Bar - Scrollable on mobile */}
         <div className="glass-card rounded-xl border border-border/50 p-3 md:p-4 overflow-x-auto">

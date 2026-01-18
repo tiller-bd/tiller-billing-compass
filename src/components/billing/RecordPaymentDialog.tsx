@@ -42,7 +42,7 @@ export function RecordPaymentDialog({ bill, totalProjectValue, onSuccess }: Reco
           <Banknote size={14} /> Record Payment
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-black uppercase flex items-center gap-2">
             <Banknote className="text-success" /> Update Received
