@@ -7,6 +7,7 @@ import { Loader2, AlertTriangle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -45,6 +46,12 @@ interface Project {
   client?: { id: number; name: string };
   department?: { id: number; name: string };
   category?: { id: number; name: string };
+  pgPercent?: number | null;
+  pgAmount?: number | null;
+  pgBankSharePercent?: number | null;
+  pgUserDeposit?: number | null;
+  pgStatus?: string | null;
+  pgClearanceDate?: string | null;
 }
 
 interface EditProjectDialogProps {
@@ -60,6 +67,12 @@ interface ProjectFormData {
   clientId: string;
   departmentId: string;
   categoryId: string;
+  pg?: {
+    inputType: 'percentage' | 'amount';
+    percent: string;
+    amount: string;
+    bankSharePercent: string;
+  };
 }
 
 export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps) {
@@ -67,6 +80,15 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingData, setPendingData] = useState<ProjectFormData | null>(null);
+
+  // PG state
+  const [pgEnabled, setPgEnabled] = useState(false);
+  const [pgInputType, setPgInputType] = useState<'percentage' | 'amount'>('percentage');
+  const [calculatedPgValues, setCalculatedPgValues] = useState<{
+    pgAmount: number;
+    userDeposit: number;
+    bankShare: number;
+  } | null>(null);
 
   // Dropdown data
   const [clients, setClients] = useState<{ id: number; name: string }[]>([]);
@@ -88,6 +110,12 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
       clientId: String(project.clientId),
       departmentId: String(project.departmentId),
       categoryId: String(project.categoryId),
+      pg: {
+        inputType: 'percentage',
+        percent: String(project.pgPercent || ''),
+        amount: String(project.pgAmount || ''),
+        bankSharePercent: String(project.pgBankSharePercent || '0'),
+      },
     },
   });
 
@@ -117,6 +145,31 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
   // Reset form when project changes
   useEffect(() => {
     if (open) {
+      // Pre-populate PG state
+      const hasPg = project.pgAmount && Number(project.pgAmount) > 0;
+      setPgEnabled(!!hasPg);
+
+      if (hasPg) {
+        // Determine input type based on which value is more precise
+        const pgPercent = Number(project.pgPercent || 0);
+        const pgAmount = Number(project.pgAmount || 0);
+        setPgInputType(pgPercent > 0 ? 'percentage' : 'amount');
+
+        // Calculate and display values
+        const totalValue = Number(project.totalProjectValue || 0);
+        const bankShare = Number(project.pgBankSharePercent || 0);
+        const userDeposit = Number(project.pgUserDeposit || 0);
+        const bankShareAmount = pgAmount - userDeposit;
+
+        setCalculatedPgValues({
+          pgAmount,
+          userDeposit,
+          bankShare: bankShareAmount,
+        });
+      } else {
+        setCalculatedPgValues(null);
+      }
+
       reset({
         projectName: project.projectName || "",
         startDate: formatDateForInput(project.startDate),
@@ -125,6 +178,12 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
         clientId: String(project.clientId),
         departmentId: String(project.departmentId),
         categoryId: String(project.categoryId),
+        pg: {
+          inputType: 'percentage',
+          percent: String(project.pgPercent || ''),
+          amount: String(project.pgAmount || ''),
+          bankSharePercent: String(project.pgBankSharePercent || '0'),
+        },
       });
     }
   }, [open, project, reset]);
@@ -132,6 +191,71 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(Math.round(amount));
     return `৳${formatted}`;
+  };
+
+  // PG calculation handlers
+  const handlePgPercentBlur = () => {
+    const percent = parseFloat(watch("pg.percent") || "0");
+    const totalValue = parseFloat(watch("totalProjectValue") || "0");
+    const bankSharePercent = parseFloat(watch("pg.bankSharePercent") || "0");
+
+    if (totalValue > 0 && percent > 0) {
+      const amount = (percent / 100) * totalValue;
+      setValue("pg.amount", amount.toString());
+
+      const userSharePercent = 100 - bankSharePercent;
+      const userDeposit = (userSharePercent / 100) * amount;
+      const bankShare = amount - userDeposit;
+
+      setCalculatedPgValues({
+        pgAmount: amount,
+        userDeposit,
+        bankShare,
+      });
+    } else {
+      setCalculatedPgValues(null);
+    }
+  };
+
+  const handlePgAmountBlur = () => {
+    const amount = parseFloat(watch("pg.amount") || "0");
+    const totalValue = parseFloat(watch("totalProjectValue") || "0");
+    const bankSharePercent = parseFloat(watch("pg.bankSharePercent") || "0");
+
+    if (totalValue > 0 && amount > 0) {
+      const percent = (amount / totalValue) * 100;
+      setValue("pg.percent", percent.toString());
+
+      const userSharePercent = 100 - bankSharePercent;
+      const userDeposit = (userSharePercent / 100) * amount;
+      const bankShare = amount - userDeposit;
+
+      setCalculatedPgValues({
+        pgAmount: amount,
+        userDeposit,
+        bankShare,
+      });
+    } else {
+      setCalculatedPgValues(null);
+    }
+  };
+
+  const handleBankShareBlur = () => {
+    // Recalculate user deposit based on current PG amount and new bank share
+    const amount = parseFloat(watch("pg.amount") || "0");
+    const bankSharePercent = parseFloat(watch("pg.bankSharePercent") || "0");
+
+    if (amount > 0) {
+      const userSharePercent = 100 - bankSharePercent;
+      const userDeposit = (userSharePercent / 100) * amount;
+      const bankShare = amount - userDeposit;
+
+      setCalculatedPgValues({
+        pgAmount: amount,
+        userDeposit,
+        bankShare,
+      });
+    }
   };
 
   const onSubmit = (data: ProjectFormData) => {
@@ -146,18 +270,34 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
     setShowConfirmation(false);
 
     try {
+      // Build payload with PG data if enabled
+      const payload: any = {
+        projectName: pendingData.projectName,
+        startDate: pendingData.startDate || null,
+        endDate: pendingData.endDate || null,
+        totalProjectValue: Number(pendingData.totalProjectValue),
+        clientId: Number(pendingData.clientId),
+        departmentId: Number(pendingData.departmentId),
+        categoryId: Number(pendingData.categoryId),
+      };
+
+      // Include PG data if enabled
+      if (pgEnabled && pendingData.pg) {
+        payload.pg = {
+          inputType: pgInputType,
+          percent: pendingData.pg.percent,
+          amount: pendingData.pg.amount,
+          bankSharePercent: pendingData.pg.bankSharePercent,
+        };
+      } else {
+        // Clear PG if disabled
+        payload.pg = null;
+      }
+
       const response = await fetch(`/api/projects/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectName: pendingData.projectName,
-          startDate: pendingData.startDate || null,
-          endDate: pendingData.endDate || null,
-          totalProjectValue: Number(pendingData.totalProjectValue),
-          clientId: Number(pendingData.clientId),
-          departmentId: Number(pendingData.departmentId),
-          categoryId: Number(pendingData.categoryId),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -321,6 +461,141 @@ export function EditProjectDialog({ project, onSuccess }: EditProjectDialogProps
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Project Guarantee (PG) Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="pgEnabled"
+                  checked={pgEnabled}
+                  onCheckedChange={(checked) => {
+                    setPgEnabled(!!checked);
+                    if (!checked) {
+                      setCalculatedPgValues(null);
+                      setValue("pg.percent", "");
+                      setValue("pg.amount", "");
+                      setValue("pg.bankSharePercent", "0");
+                    }
+                  }}
+                />
+                <Label
+                  htmlFor="pgEnabled"
+                  className="text-xs font-black uppercase text-muted-foreground cursor-pointer"
+                >
+                  Project Guarantee (PG)
+                </Label>
+              </div>
+
+              {pgEnabled && (
+                <div className="space-y-4 p-4 bg-secondary/10 rounded-xl border border-primary/10">
+                  {/* Input Type Toggle */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={pgInputType === 'percentage' ? 'default' : 'outline'}
+                      onClick={() => setPgInputType('percentage')}
+                      className="flex-1 font-bold"
+                    >
+                      By Percentage
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={pgInputType === 'amount' ? 'default' : 'outline'}
+                      onClick={() => setPgInputType('amount')}
+                      className="flex-1 font-bold"
+                    >
+                      By Amount
+                    </Button>
+                  </div>
+
+                  {/* PG Input Field */}
+                  {pgInputType === 'percentage' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="pgPercent" className="text-xs font-bold text-muted-foreground">
+                        PG Percentage (%)
+                      </Label>
+                      <Input
+                        id="pgPercent"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        {...register("pg.percent")}
+                        onBlur={handlePgPercentBlur}
+                        className="h-11 font-bold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="pgAmount" className="text-xs font-bold text-muted-foreground">
+                        PG Amount (BDT)
+                      </Label>
+                      <Input
+                        id="pgAmount"
+                        type="number"
+                        step="1"
+                        min="0"
+                        {...register("pg.amount")}
+                        onBlur={handlePgAmountBlur}
+                        className="h-11 font-bold"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
+
+                  {/* Bank Share Percentage */}
+                  <div className="space-y-2">
+                    <Label htmlFor="pgBankShare" className="text-xs font-bold text-muted-foreground">
+                      Bank Share (%)
+                    </Label>
+                    <Input
+                      id="pgBankShare"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      {...register("pg.bankSharePercent")}
+                      onBlur={handleBankShareBlur}
+                      className="h-11 font-bold"
+                      placeholder="0.00"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Your share: {100 - Number(watch("pg.bankSharePercent") || 0)}%
+                    </p>
+                  </div>
+
+                  {/* Calculated Values Display */}
+                  {calculatedPgValues && (
+                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+                      <p className="text-xs font-black uppercase text-muted-foreground mb-3">
+                        Calculated PG Breakdown
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Total PG Amount:</span>
+                        <span className="text-sm font-bold text-primary">
+                          {formatCurrency(calculatedPgValues.pgAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Your Deposit:</span>
+                        <span className="text-sm font-bold text-green-600">
+                          {formatCurrency(calculatedPgValues.userDeposit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Bank Share:</span>
+                        <span className="text-sm font-bold text-blue-600">
+                          {formatCurrency(calculatedPgValues.bankShare)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

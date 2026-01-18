@@ -32,8 +32,15 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   const [loading, setLoading] = useState(false);
   const [lookups, setLookups] = useState({ clients: [], categories: [], departments: [] });
   const [isNewClient, setIsNewClient] = useState(false);
+  const [isNewCategory, setIsNewCategory] = useState(false);
+  const [isNewDepartment, setIsNewDepartment] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [creatingDepartment, setCreatingDepartment] = useState(false);
   const [ignoreTotalCheck, setIgnoreTotalCheck] = useState(false);
   const [amountErrors, setAmountErrors] = useState<Record<number, boolean>>({});
+  const [pgEnabled, setPgEnabled] = useState(false);
+  const [pgInputType, setPgInputType] = useState<'percentage' | 'amount'>('percentage');
 
   // Use controlled state if provided, otherwise fallback to local state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -54,16 +61,20 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       totalProjectValue: "",
       startDate: getCurrentDate(),
       newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
+      newCategory: { name: "", description: "" },
+      newDepartment: { name: "", description: "" },
       bills: [
         { billName: "Inception", billPercent: "20", billAmount: "", tentativeBillingDate: "" },
         { billName: "Final handover", billPercent: "80", billAmount: "", tentativeBillingDate: "" }
-      ]
+      ],
+      pg: { percent: "", amount: "", bankSharePercent: "50" }
     }
   });
 
   const { fields, remove, insert } = useFieldArray({ control, name: "bills" });
 
   const watchedBills = watch("bills");
+  const watchedPg = watch("pg");
   // Use roundAmount for consistent integer handling
   const totalValue = roundAmount(parseFloat(watch("totalProjectValue") || "0"));
 
@@ -75,6 +86,33 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   const totalBillAmounts = useMemo(() => {
     return watchedBills.reduce((sum, bill) => sum + roundAmount(parseFloat(bill.billAmount || "0")), 0);
   }, [watchedBills]);
+
+  // Calculate PG values
+  const calculatedPgValues = useMemo(() => {
+    if (!pgEnabled || !watchedPg) return null;
+
+    const pgPercent = parseFloat(watchedPg.percent || "0");
+    const pgAmount = parseFloat(watchedPg.amount || "0");
+    const bankSharePercent = parseFloat(watchedPg.bankSharePercent || "0");
+
+    let finalPgAmount = 0;
+    if (pgInputType === 'percentage' && pgPercent > 0 && totalValue > 0) {
+      finalPgAmount = (pgPercent / 100) * totalValue;
+    } else if (pgInputType === 'amount' && pgAmount > 0) {
+      finalPgAmount = pgAmount;
+    }
+
+    const userSharePercent = 100 - bankSharePercent;
+    const userDeposit = (userSharePercent / 100) * finalPgAmount;
+    const bankShare = (bankSharePercent / 100) * finalPgAmount;
+
+    return {
+      pgAmount: roundAmount(finalPgAmount),
+      userDeposit: roundAmount(userDeposit),
+      bankShare: roundAmount(bankShare),
+      bankSharePercent
+    };
+  }, [watchedPg, pgEnabled, pgInputType, totalValue]);
 
   // Use epsilon tolerance for floating-point comparison (0.01% tolerance for 100% check)
   const isPercentValid = ignoreTotalCheck || isApproximatelyEqual(totalPercentage, 100, 0.01);
@@ -107,6 +145,14 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
               setIgnoreTotalCheck(parsedDraft[key]);
             } else if (key === 'isNewClient') {
               setIsNewClient(parsedDraft[key]);
+            } else if (key === 'isNewCategory') {
+              setIsNewCategory(parsedDraft[key]);
+            } else if (key === 'isNewDepartment') {
+              setIsNewDepartment(parsedDraft[key]);
+            } else if (key === 'pgEnabled') {
+              setPgEnabled(parsedDraft[key]);
+            } else if (key === 'pgInputType') {
+              setPgInputType(parsedDraft[key]);
             } else {
               setValue(key as any, parsedDraft[key]);
             }
@@ -127,7 +173,11 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
         const draftData = {
           ...formData,
           ignoreTotalCheck,
-          isNewClient
+          isNewClient,
+          isNewCategory,
+          isNewDepartment,
+          pgEnabled,
+          pgInputType
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       };
@@ -137,7 +187,8 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
     }
   }, [watchedBills, watch("projectName"), watch("totalProjectValue"), watch("clientId"),
     watch("categoryId"), watch("departmentId"), watch("startDate"),
-    watch("newClient"), ignoreTotalCheck, isNewClient, open, getValues]);
+    watch("newClient"), watch("newCategory"), watch("newDepartment"), watchedPg,
+    ignoreTotalCheck, isNewClient, isNewCategory, isNewDepartment, pgEnabled, pgInputType, open, getValues]);
 
   const validateAmount = (index: number, amount: string) => {
     const amt = parseFloat(amount || "0");
@@ -231,6 +282,64 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       setValue(`bills.${i}.billAmount`, amount.toString());
       validateAmount(i, amount.toString());
     });
+
+    // Also recalculate PG if using percentage mode
+    if (pgEnabled && pgInputType === 'percentage') {
+      const pgPercent = parseFloat(watch("pg.percent") || "0");
+      if (pgPercent > 0 && total > 0) {
+        const amount = calculateAmountFromPercentage(pgPercent, total);
+        setValue("pg.amount", amount.toString());
+      }
+    } else if (pgEnabled && pgInputType === 'amount') {
+      // Recalculate percentage if using amount mode
+      const pgAmount = parseFloat(watch("pg.amount") || "0");
+      if (pgAmount > 0 && total > 0) {
+        const percent = calculatePercentage(pgAmount, total);
+        setValue("pg.percent", percent.toFixed(2));
+      }
+    }
+  };
+
+  // Handle PG percentage blur - calculate amount from percentage
+  const handlePgPercentBlur = () => {
+    const percent = parseFloat(watch("pg.percent") || "0");
+    if (percent > 100) {
+      setValue("pg.percent", "100");
+      toast.warning("PG percentage cannot exceed 100%");
+    }
+    if (percent < 0) {
+      setValue("pg.percent", "0");
+    }
+
+    const validPercent = Math.min(Math.max(parseFloat(watch("pg.percent") || "0"), 0), 100);
+    if (totalValue > 0 && validPercent > 0) {
+      const amount = calculateAmountFromPercentage(validPercent, totalValue);
+      setValue("pg.amount", amount.toString());
+    }
+  };
+
+  // Handle PG amount blur - calculate percentage from amount
+  const handlePgAmountBlur = () => {
+    const amount = roundAmount(parseFloat(watch("pg.amount") || "0"));
+
+    if (amount < 0) {
+      setValue("pg.amount", "0");
+      setValue("pg.percent", "0");
+      return;
+    }
+
+    if (amount > totalValue) {
+      toast.warning("PG amount cannot exceed total project value");
+      setValue("pg.amount", totalValue.toString());
+    }
+
+    const validAmount = Math.min(amount, totalValue);
+    setValue("pg.amount", validAmount.toString());
+
+    if (totalValue > 0 && validAmount > 0) {
+      const percent = calculatePercentage(validAmount, totalValue);
+      setValue("pg.percent", percent.toFixed(2));
+    }
   };
 
   const addDeliverable = () => {
@@ -248,6 +357,111 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       billAmount: defaultAmount.toString(),
       tentativeBillingDate: ""
     });
+  };
+
+  // Create new client immediately
+  const handleCreateClient = async () => {
+    const clientData = watch("newClient");
+    if (!clientData.name || !clientData.name.trim()) {
+      toast.error("Client name is required");
+      return;
+    }
+
+    setCreatingClient(true);
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clientData)
+      });
+      if (!res.ok) throw new Error();
+      const newClient = await res.json();
+
+      // Refresh clients list
+      const clientsRes = await fetch('/api/clients');
+      const clients = await clientsRes.json();
+      setLookups(prev => ({ ...prev, clients }));
+
+      // Select the newly created client
+      setValue("clientId", newClient.id.toString());
+      setIsNewClient(false);
+      setValue("newClient", { name: "", contactPerson: "", contactEmail: "", contactPhone: "" });
+      toast.success("Client created successfully");
+    } catch (err) {
+      toast.error("Failed to create client");
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  // Create new category immediately
+  const handleCreateCategory = async () => {
+    const categoryData = watch("newCategory");
+    if (!categoryData.name || !categoryData.name.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    setCreatingCategory(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(categoryData)
+      });
+      if (!res.ok) throw new Error();
+      const newCategory = await res.json();
+
+      // Refresh categories list
+      const categoriesRes = await fetch('/api/categories');
+      const categories = await categoriesRes.json();
+      setLookups(prev => ({ ...prev, categories }));
+
+      // Select the newly created category
+      setValue("categoryId", newCategory.id.toString());
+      setIsNewCategory(false);
+      setValue("newCategory", { name: "", description: "" });
+      toast.success("Category created successfully");
+    } catch (err) {
+      toast.error("Failed to create category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  // Create new department immediately
+  const handleCreateDepartment = async () => {
+    const departmentData = watch("newDepartment");
+    if (!departmentData.name || !departmentData.name.trim()) {
+      toast.error("Department name is required");
+      return;
+    }
+
+    setCreatingDepartment(true);
+    try {
+      const res = await fetch('/api/departments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(departmentData)
+      });
+      if (!res.ok) throw new Error();
+      const newDepartment = await res.json();
+
+      // Refresh departments list
+      const departmentsRes = await fetch('/api/departments');
+      const departments = await departmentsRes.json();
+      setLookups(prev => ({ ...prev, departments }));
+
+      // Select the newly created department
+      setValue("departmentId", newDepartment.id.toString());
+      setIsNewDepartment(false);
+      setValue("newDepartment", { name: "", description: "" });
+      toast.success("Department created successfully");
+    } catch (err) {
+      toast.error("Failed to create department");
+    } finally {
+      setCreatingDepartment(false);
+    }
   };
 
   useEffect(() => {
@@ -288,10 +502,27 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
     setLoading(true);
     try {
+      // Don't send newClient, newCategory, newDepartment, pg (handle separately) as they're created separately
+      const { newClient, newCategory, newDepartment, pg: _, ...projectData } = data;
+
+      const payload: any = {
+        ...projectData
+      };
+
+      // Only add PG if enabled
+      if (pgEnabled) {
+        payload.pg = {
+          inputType: pgInputType,
+          percent: data.pg.percent,
+          amount: data.pg.amount,
+          bankSharePercent: data.pg.bankSharePercent
+        };
+      }
+
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error();
       toast.success("Project Authorized: Billing milestones initialized.");
@@ -308,13 +539,20 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
         totalProjectValue: "",
         startDate: getCurrentDate(),
         newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
+        newCategory: { name: "", description: "" },
+        newDepartment: { name: "", description: "" },
         bills: [
           { billName: "Inception", billPercent: "20", billAmount: "", tentativeBillingDate: "" },
           { billName: "Final handover", billPercent: "80", billAmount: "", tentativeBillingDate: "" }
-        ]
+        ],
+        pg: { percent: "", amount: "", bankSharePercent: "50" }
       });
       setIsNewClient(false);
+      setIsNewCategory(false);
+      setIsNewDepartment(false);
       setIgnoreTotalCheck(false);
+      setPgEnabled(false);
+      setPgInputType('percentage');
       setAmountErrors({});
       onProjectAdded();
     } catch (err) {
@@ -331,7 +569,11 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       const draftData = {
         ...formData,
         ignoreTotalCheck,
-        isNewClient
+        isNewClient,
+        isNewCategory,
+        isNewDepartment,
+        pgEnabled,
+        pgInputType
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       toast.info("Draft saved automatically");
@@ -403,6 +645,11 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
   const allocationStatus = getAllocationStatus();
 
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogTrigger asChild>
@@ -462,9 +709,21 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Domain / Category</Label>
-              <Select value={watch("categoryId")} onValueChange={(v) => setValue("categoryId", v)}>
+              <Select
+                value={isNewCategory ? "new" : watch("categoryId")}
+                onValueChange={(v) => {
+                  if (v === "new") {
+                    setIsNewCategory(true);
+                    setValue("categoryId", "");
+                  } else {
+                    setIsNewCategory(false);
+                    setValue("categoryId", v);
+                  }
+                }}
+              >
                 <SelectTrigger className="h-10"><SelectValue placeholder="Category" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="new" className="text-primary font-black">+ Create New Category</SelectItem>
                   {lookups.categories.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -472,9 +731,21 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Division</Label>
-              <Select value={watch("departmentId")} onValueChange={(v) => setValue("departmentId", v)}>
+              <Select
+                value={isNewDepartment ? "new" : watch("departmentId")}
+                onValueChange={(v) => {
+                  if (v === "new") {
+                    setIsNewDepartment(true);
+                    setValue("departmentId", "");
+                  } else {
+                    setIsNewDepartment(false);
+                    setValue("departmentId", v);
+                  }
+                }}
+              >
                 <SelectTrigger className="h-10"><SelectValue placeholder="Dept" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="new" className="text-primary font-black">+ Create New Department</SelectItem>
                   {lookups.departments.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -487,11 +758,116 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
           </div>
 
           {isNewClient && (
-            <div className="p-6 bg-primary/[0.02] border border-primary/10 rounded-2xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
-              <Input placeholder="Client Name" {...register("newClient.name")} required />
-              <Input placeholder="POC Person" {...register("newClient.contactPerson")} />
-              <Input placeholder="Email" type="email" {...register("newClient.contactEmail")} />
-              <Input placeholder="Contact No" {...register("newClient.contactPhone")} />
+            <div className="p-6 bg-primary/[0.02] border border-primary/10 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Input placeholder="Client Name *" {...register("newClient.name")} required />
+                <Input placeholder="POC Person" {...register("newClient.contactPerson")} />
+                <Input placeholder="Email" type="email" {...register("newClient.contactEmail")} />
+                <Input placeholder="Contact No" {...register("newClient.contactPhone")} />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={handleCreateClient}
+                  disabled={creatingClient}
+                  className="h-9 font-bold"
+                >
+                  {creatingClient ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Client"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsNewClient(false);
+                    setValue("clientId", "");
+                    setValue("newClient", { name: "", contactPerson: "", contactEmail: "", contactPhone: "" });
+                  }}
+                  className="h-9 font-bold"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isNewCategory && (
+            <div className="p-6 bg-primary/[0.02] border border-primary/10 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input placeholder="Category Name *" {...register("newCategory.name")} required />
+                <Input placeholder="Description (optional)" {...register("newCategory.description")} />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  disabled={creatingCategory}
+                  className="h-9 font-bold"
+                >
+                  {creatingCategory ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Category"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsNewCategory(false);
+                    setValue("newCategory", { name: "", description: "" });
+                  }}
+                  className="h-9 font-bold"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isNewDepartment && (
+            <div className="p-6 bg-primary/[0.02] border border-primary/10 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input placeholder="Department Name *" {...register("newDepartment.name")} required />
+                <Input placeholder="Description (optional)" {...register("newDepartment.description")} />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={handleCreateDepartment}
+                  disabled={creatingDepartment}
+                  className="h-9 font-bold"
+                >
+                  {creatingDepartment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Department"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsNewDepartment(false);
+                    setValue("newDepartment", { name: "", description: "" });
+                  }}
+                  className="h-9 font-bold"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
 
@@ -593,6 +969,122 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Project Guarantee (PG) Section */}
+          <div className="space-y-4 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <Label className="text-xl font-black uppercase tracking-tight">
+                Project Guarantee (PG)
+              </Label>
+              <Checkbox
+                checked={pgEnabled}
+                onCheckedChange={(checked) => setPgEnabled(!!checked)}
+              />
+            </div>
+
+            {pgEnabled && (
+              <div className="space-y-4 p-4 bg-secondary/10 rounded-xl border border-border/50">
+                {/* Input Type Toggle */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={pgInputType === 'percentage' ? 'default' : 'outline'}
+                    onClick={() => setPgInputType('percentage')}
+                    className="flex-1 h-10 font-bold"
+                  >
+                    By Percentage
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={pgInputType === 'amount' ? 'default' : 'outline'}
+                    onClick={() => setPgInputType('amount')}
+                    className="flex-1 h-10 font-bold"
+                  >
+                    By Amount
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Percentage or Amount Input */}
+                  {pgInputType === 'percentage' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="pgPercent" className="text-[10px] font-black uppercase text-muted-foreground">
+                        PG Percentage (%)
+                      </Label>
+                      <Input
+                        id="pgPercent"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        {...register("pg.percent")}
+                        placeholder="e.g., 5"
+                        className="h-10 font-bold"
+                        onBlur={handlePgPercentBlur}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="pgAmount" className="text-[10px] font-black uppercase text-muted-foreground">
+                        PG Amount (BDT)
+                      </Label>
+                      <Input
+                        id="pgAmount"
+                        type="number"
+                        min="0"
+                        {...register("pg.amount")}
+                        placeholder="e.g., 50000"
+                        className="h-10 font-bold"
+                        onBlur={handlePgAmountBlur}
+                      />
+                    </div>
+                  )}
+
+                  {/* Bank Share */}
+                  <div className="space-y-2">
+                    <Label htmlFor="pgBankShare" className="text-[10px] font-black uppercase text-muted-foreground">
+                      Bank Share (%)
+                    </Label>
+                    <Input
+                      id="pgBankShare"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      {...register("pg.bankSharePercent")}
+                      placeholder="e.g., 50"
+                      className="h-10 font-bold"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Your share: {100 - parseFloat(watch("pg.bankSharePercent") || "0")}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Display Calculated Values */}
+                {calculatedPgValues && calculatedPgValues.pgAmount > 0 && (
+                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-2 text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-black uppercase text-primary">PG Calculation</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total PG Amount:</span>
+                      <span className="font-bold">{formatCurrency(calculatedPgValues.pgAmount)}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-muted-foreground">Your Deposit ({100 - calculatedPgValues.bankSharePercent}%):</span>
+                      <span className="font-bold text-primary">{formatCurrency(calculatedPgValues.userDeposit)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Bank Share ({calculatedPgValues.bankSharePercent}%):</span>
+                      <span className="font-bold">{formatCurrency(calculatedPgValues.bankShare)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">

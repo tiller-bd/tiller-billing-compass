@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Wallet, TrendingUp, TrendingDown, FolderKanban, Maximize2, RefreshCw, X } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, FolderKanban, Maximize2, RefreshCw, X, Shield } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
@@ -252,6 +252,56 @@ export default function DashboardPage() {
             <MetricCard loading={loadingStates.metrics} title="Active Projects" value={metrics?.activeCount?.toString() || "0"} icon={FolderKanban} />
           </div>
         </div>
+
+        {/* Project Guarantee (PG) Metrics - Conditional Display */}
+        {metrics && (metrics.pgDeposited > 0 || metrics.pgCleared > 0 || metrics.pgPending > 0) && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <Shield className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+              <h3 className="text-xs md:text-sm font-black uppercase tracking-wider text-muted-foreground">
+                Project Guarantee (PG) Overview
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loadingStates.metrics}
+                  title="PG Deposited"
+                  value={formatCurrency(metrics?.pgDeposited || 0)}
+                  icon={Shield}
+                  variant="default"
+                />
+              </div>
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loadingStates.metrics}
+                  title="PG Cleared"
+                  value={formatCurrency(metrics?.pgCleared || 0)}
+                  icon={TrendingUp}
+                  variant="success"
+                />
+              </div>
+              <div className="relative group">
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                  <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </Button>
+                <MetricCard
+                  loading={loadingStates.metrics}
+                  title="PG Pending"
+                  value={formatCurrency(metrics?.pgPending || 0)}
+                  icon={TrendingDown}
+                  variant="warning"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <Tabs defaultValue="charts">
           <TabsList className="glass-card mb-4 w-full md:w-auto">

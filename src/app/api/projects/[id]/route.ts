@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { projectName, startDate, endDate, totalProjectValue, clientId, departmentId, categoryId } = body;
+    const { projectName, startDate, endDate, totalProjectValue, clientId, departmentId, categoryId, pg } = body;
 
     // Validate the project exists
     const existingProject = await prisma.project.findUnique({
@@ -100,6 +100,73 @@ export async function PATCH(
 
     if (categoryId !== undefined) {
       updateData.categoryId = parseInt(categoryId);
+    }
+
+    // Handle PG updates
+    if (pg !== undefined) {
+      if (pg && (pg.percent > 0 || pg.amount > 0)) {
+        const totalValue = totalProjectValue !== undefined
+          ? Number(totalProjectValue)
+          : Number(existingProject.totalProjectValue || 0);
+
+        let pgAmount = 0;
+        let pgPercent = 0;
+
+        // Calculate based on input type
+        if (pg.inputType === 'percentage') {
+          pgPercent = parseFloat(pg.percent) || 0;
+          pgAmount = (pgPercent / 100) * totalValue;
+        } else {
+          pgAmount = parseFloat(pg.amount) || 0;
+          pgPercent = totalValue > 0 ? (pgAmount / totalValue) * 100 : 0;
+        }
+
+        // Validate PG values
+        if (pgPercent > 100) {
+          return apiError("PG percentage cannot exceed 100%", "VALIDATION_ERROR");
+        }
+        if (pgAmount > totalValue) {
+          return apiError("PG amount cannot exceed total project value", "VALIDATION_ERROR");
+        }
+
+        const bankSharePercent = parseFloat(pg.bankSharePercent) || 0;
+        if (bankSharePercent < 0 || bankSharePercent > 100) {
+          return apiError("Bank share percentage must be between 0 and 100", "VALIDATION_ERROR");
+        }
+
+        const userSharePercent = 100 - bankSharePercent;
+        const pgUserDeposit = (userSharePercent / 100) * pgAmount;
+
+        updateData.pgPercent = pgPercent;
+        updateData.pgAmount = pgAmount;
+        updateData.pgBankSharePercent = bankSharePercent;
+        updateData.pgUserDeposit = pgUserDeposit;
+
+        // Don't overwrite status and clearance date if already set
+        if (existingProject.pgStatus === null || existingProject.pgStatus === undefined) {
+          updateData.pgStatus = 'PENDING';
+        }
+      } else {
+        // Clear PG if pg is explicitly set to null or empty
+        updateData.pgPercent = null;
+        updateData.pgAmount = null;
+        updateData.pgBankSharePercent = null;
+        updateData.pgUserDeposit = null;
+        updateData.pgStatus = null;
+        updateData.pgClearanceDate = null;
+      }
+    }
+
+    // If totalProjectValue changed and PG exists, recalculate PG amounts based on stored percent
+    if (totalProjectValue !== undefined && existingProject.pgPercent && !pg) {
+      const newTotal = Number(totalProjectValue);
+      const pgPercent = Number(existingProject.pgPercent);
+      const pgAmount = (pgPercent / 100) * newTotal;
+      const bankShare = Number(existingProject.pgBankSharePercent || 0);
+      const pgUserDeposit = ((100 - bankShare) / 100) * pgAmount;
+
+      updateData.pgAmount = pgAmount;
+      updateData.pgUserDeposit = pgUserDeposit;
     }
 
     // Update the project

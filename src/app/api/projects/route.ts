@@ -87,13 +87,13 @@ export async function POST(request: NextRequest) {
     const {
       projectName,
       clientId,
-      newClient,
       departmentId,
       categoryId,
       startDate,
       endDate,
       totalProjectValue,
       bills,
+      pg,
     } = body;
 
     if (!projectName || !projectName.trim()) {
@@ -108,34 +108,77 @@ export async function POST(request: NextRequest) {
       return apiError("Category is required", "VALIDATION_ERROR");
     }
 
+    if (!clientId) {
+      return apiError("Client is required", "VALIDATION_ERROR");
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      let finalClientId = clientId;
-      if (!clientId && newClient) {
-        const client = await tx.client.create({ data: newClient });
-        finalClientId = client.id;
+      // Build base data object
+      const projectData: any = {
+        projectName: projectName.trim(),
+        clientId: parseInt(clientId),
+        departmentId: parseInt(departmentId),
+        categoryId: parseInt(categoryId),
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        totalProjectValue: parseFloat(totalProjectValue) || 0,
+        bills: {
+          create: (bills || []).map((bill: any) => ({
+            billName: bill.billName,
+            billPercent: parseFloat(bill.billPercent) || 0,
+            billAmount: parseFloat(bill.billAmount) || 0,
+            tentativeBillingDate: bill.tentativeBillingDate
+              ? new Date(bill.tentativeBillingDate)
+              : null,
+            status: "PENDING",
+          })),
+        },
+      };
+
+      // Only add PG fields if they're provided and have valid values
+      const hasPgData = pg && pg.percent && parseFloat(pg.percent) > 0 ||
+                        pg && pg.amount && parseFloat(pg.amount) > 0;
+
+      if (hasPgData) {
+        const totalValue = parseFloat(totalProjectValue) || 0;
+        let pgAmount = 0;
+        let pgPercent = 0;
+
+        // Calculate based on input type
+        if (pg.inputType === 'percentage') {
+          pgPercent = parseFloat(pg.percent) || 0;
+          pgAmount = (pgPercent / 100) * totalValue;
+        } else {
+          pgAmount = parseFloat(pg.amount) || 0;
+          pgPercent = totalValue > 0 ? (pgAmount / totalValue) * 100 : 0;
+        }
+
+        // Validate PG values
+        if (pgPercent > 100) {
+          throw new Error("PG percentage cannot exceed 100%");
+        }
+        if (pgAmount > totalValue) {
+          throw new Error("PG amount cannot exceed total project value");
+        }
+
+        const bankSharePercent = parseFloat(pg.bankSharePercent) || 0;
+        if (bankSharePercent < 0 || bankSharePercent > 100) {
+          throw new Error("Bank share percentage must be between 0 and 100");
+        }
+
+        const userSharePercent = 100 - bankSharePercent;
+        const pgUserDeposit = (userSharePercent / 100) * pgAmount;
+
+        projectData.pgPercent = pgPercent;
+        projectData.pgAmount = pgAmount;
+        projectData.pgBankSharePercent = bankSharePercent;
+        projectData.pgUserDeposit = pgUserDeposit;
+        projectData.pgStatus = 'PENDING';
+        projectData.pgClearanceDate = null;
       }
 
       return await tx.project.create({
-        data: {
-          projectName: projectName.trim(),
-          clientId: parseInt(finalClientId),
-          departmentId: parseInt(departmentId),
-          categoryId: parseInt(categoryId),
-          startDate: startDate ? new Date(startDate) : null,
-          endDate: endDate ? new Date(endDate) : null,
-          totalProjectValue: parseFloat(totalProjectValue) || 0,
-          bills: {
-            create: (bills || []).map((bill: any) => ({
-              billName: bill.billName,
-              billPercent: parseFloat(bill.billPercent) || 0,
-              billAmount: parseFloat(bill.billAmount) || 0,
-              tentativeBillingDate: bill.tentativeBillingDate
-                ? new Date(bill.tentativeBillingDate)
-                : null,
-              status: "PENDING",
-            })),
-          },
-        },
+        data: projectData,
       });
     });
     return NextResponse.json(result, { status: 201 });

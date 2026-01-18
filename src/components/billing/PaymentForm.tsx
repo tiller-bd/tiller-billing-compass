@@ -357,6 +357,19 @@ export function PaymentForm({ bill, totalProjectValue, onSuccess }: PaymentFormP
           </div>
         </div>
 
+        {/* Quick Action: Pay Full Remaining */}
+        {remainingAmount > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 font-bold border-primary/30 hover:bg-primary/10 hover:border-primary"
+            onClick={() => handleAmountChange(remainingAmount.toString())}
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Pay Full Remaining ({formatCurrency(remainingAmount)})
+          </Button>
+        )}
+
         {/* Real-time Status Preview - Percentages relative to Total Project */}
         {watchedAmount && Number(watchedAmount) > 0 && (
           <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">

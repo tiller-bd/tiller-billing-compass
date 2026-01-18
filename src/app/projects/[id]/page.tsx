@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Receipt, TrendingUp, Sparkles, Target, CheckCircle2, ChevronDown, ChevronUp, Settings2, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { ArrowLeft, Receipt, TrendingUp, Sparkles, Target, CheckCircle2, ChevronDown, ChevronUp, Settings2, ChevronLeft, ChevronRight, Pencil, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line
@@ -55,6 +56,31 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
         setLoading(false);
       });
   }, [id]);
+
+  const handleClearPg = async () => {
+    if (!confirm('Are you sure you want to mark the Project Guarantee as cleared?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${id}/clear-pg`, {
+        method: 'PATCH',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to clear PG');
+      }
+
+      toast.success('Project Guarantee marked as cleared');
+
+      // Refresh project data
+      const updatedProject = await response.json();
+      setProject(updatedProject);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to clear PG');
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
@@ -238,6 +264,99 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         </div>
+
+        {/* Project Guarantee (PG) Card */}
+        {project.pgAmount && Number(project.pgAmount) > 0 && (
+          <div className="glass-card p-4 md:p-6 rounded-2xl md:rounded-3xl border-l-4 md:border-l-8 border-blue-500 shadow-xl shadow-blue-500/5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-3 md:space-y-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <Shield className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+                  <h3 className="text-xs md:text-sm font-black uppercase tracking-wider text-muted-foreground">
+                    Project Guarantee (PG)
+                  </h3>
+                  <Badge
+                    className={cn(
+                      "font-black text-[9px] md:text-[10px] px-2 md:px-2.5",
+                      project.pgStatus === 'CLEARED'
+                        ? "bg-success/10 text-success border-success/30"
+                        : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                    )}
+                    variant="outline"
+                  >
+                    {project.pgStatus || 'PENDING'}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                  <div>
+                    <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                      Total PG Amount
+                    </p>
+                    <p className="text-base md:text-xl font-black text-blue-600">
+                      {formatCurrency(Number(project.pgAmount))}
+                    </p>
+                    <p className="text-[9px] md:text-[10px] text-muted-foreground">
+                      {Number(project.pgPercent || 0).toFixed(2)}% of project
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                      Your Deposit
+                    </p>
+                    <p className="text-base md:text-xl font-black text-green-600">
+                      {formatCurrency(Number(project.pgUserDeposit || 0))}
+                    </p>
+                    <p className="text-[9px] md:text-[10px] text-muted-foreground">
+                      Your share: {100 - Number(project.pgBankSharePercent || 0)}%
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                      Bank Share
+                    </p>
+                    <p className="text-base md:text-xl font-black text-slate-600 dark:text-slate-400">
+                      {formatCurrency(
+                        Number(project.pgAmount) - Number(project.pgUserDeposit || 0)
+                      )}
+                    </p>
+                    <p className="text-[9px] md:text-[10px] text-muted-foreground">
+                      Bank share: {Number(project.pgBankSharePercent || 0)}%
+                    </p>
+                  </div>
+
+                  {project.pgClearanceDate && (
+                    <div>
+                      <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                        Clearance Date
+                      </p>
+                      <p className="text-sm md:text-base font-bold text-success">
+                        {format(new Date(project.pgClearanceDate), 'MMM dd, yyyy')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {project.pgStatus !== 'CLEARED' && (
+                <div className="shrink-0">
+                  <Button
+                    onClick={handleClearPg}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 font-bold border-success/30 text-success hover:bg-success/10"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span className="hidden md:inline">Mark as Cleared</span>
+                    <span className="md:hidden">Clear</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 3. Milestone Itemization - Collapsible with Column Settings */}
         <div className="space-y-3 md:space-y-4">

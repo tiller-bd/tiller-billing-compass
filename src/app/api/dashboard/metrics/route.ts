@@ -48,11 +48,24 @@ export async function GET(request: NextRequest) {
       .flatMap((p) => p.bills)
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
 
+    // PG (Project Guarantee) Calculations
+    const pgDeposited = projects.reduce(
+      (sum, p) => sum + Number(p.pgUserDeposit || 0),
+      0
+    );
+    const pgCleared = projects
+      .filter(p => p.pgStatus === 'CLEARED')
+      .reduce((sum, p) => sum + Number(p.pgUserDeposit || 0), 0);
+    const pgPending = pgDeposited - pgCleared;
+
     return NextResponse.json({
       totalBudget,
       totalReceived,
       totalRemaining: totalBudget - totalReceived,
       activeCount: projects.length,
+      pgDeposited,
+      pgCleared,
+      pgPending,
     });
   } catch (error) {
     console.error("Dashboard metrics error:", error);

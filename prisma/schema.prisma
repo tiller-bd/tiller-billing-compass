@@ -52,18 +52,24 @@ model ProjectCategory {
 }
 
 model Project {
-  id                Int             @id @default(autoincrement())
-  projectName       String          @map("project_name") @db.VarChar(200)
-  clientId          Int             @map("client_id")
-  departmentId      Int             @map("department_id")
-  categoryId        Int             @map("category_id")
-  startDate         DateTime?       @map("start_date") @db.Date
-  endDate           DateTime?       @map("end_date") @db.Date
-  totalProjectValue Decimal?        @map("total_project_value") @db.Decimal(15, 2)
-  client            Client          @relation(fields: [clientId], references: [id])
-  department        Department      @relation(fields: [departmentId], references: [id])
-  category          ProjectCategory @relation(fields: [categoryId], references: [id])
-  bills             ProjectBill[]
+  id                 Int             @id @default(autoincrement())
+  projectName        String          @map("project_name") @db.VarChar(200)
+  clientId           Int             @map("client_id")
+  departmentId       Int             @map("department_id")
+  categoryId         Int             @map("category_id")
+  startDate          DateTime?       @map("start_date") @db.Date
+  endDate            DateTime?       @map("end_date") @db.Date
+  totalProjectValue  Decimal?        @map("total_project_value") @db.Decimal(15, 2)
+  pgPercent          Decimal?        @map("pg_percent") @db.Decimal(5, 2)
+  pgAmount           Decimal?        @map("pg_amount") @db.Decimal(15, 2)
+  pgBankSharePercent Decimal?        @map("pg_bank_share_percent") @db.Decimal(5, 2)
+  pgUserDeposit      Decimal?        @map("pg_user_deposit") @db.Decimal(15, 2)
+  pgStatus           String?         @default("PENDING") @map("pg_status") @db.VarChar(20)
+  pgClearanceDate    DateTime?       @map("pg_clearance_date") @db.Date
+  client             Client          @relation(fields: [clientId], references: [id])
+  department         Department      @relation(fields: [departmentId], references: [id])
+  category           ProjectCategory @relation(fields: [categoryId], references: [id])
+  bills              ProjectBill[]
 
   @@map("projects")
 }

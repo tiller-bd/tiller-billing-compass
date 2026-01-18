@@ -20,7 +20,7 @@ async function createSuperAdmin() {
   const adminDetails = {
     full_name: "Super Admin",
     email: "ceo@tiller.com.bd",
-    password: "adminpassword123", // Change this to your desired password
+    password: "123456", // Change this to your desired password
     role: "SUPERADMIN",
   };
 
