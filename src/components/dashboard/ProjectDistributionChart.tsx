@@ -2,9 +2,10 @@
 
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { PieChartIcon, ChevronRight, ChevronDown } from 'lucide-react';
+import { PieChartIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+
 
 // --- Types ---
 interface BillData {
@@ -54,12 +55,12 @@ const COLOR_PALETTE = [
 ];
 
 export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectDistributionChartProps) {
-  
+
   // 1. Assign Colors to Departments
   const departmentsWithColors = data.map((dept, idx) => {
     const colorIndex = idx % COLOR_PALETTE.length;
     const { hue } = COLOR_PALETTE[colorIndex];
-    
+
     // Dept Color (Inner Ring)
     const deptFill = `hsl(${hue}, 70%, 45%)`;
 
@@ -78,7 +79,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
             const totalBills = project.children.length;
             const lightnessStep = 15 / Math.max(totalBills, 1);
             const lightness = 65 + (billIdx * lightnessStep);
-            
+
             return {
               ...bill,
               fill: `hsl(${hue}, 60%, ${Math.min(lightness, 85)}%)`,
@@ -90,9 +91,9 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   });
 
   // 2. Flatten for Render Layers
-  
+
   // Layer 2: Projects (needs ref to Dept)
-  const projectsData = departmentsWithColors.flatMap(dept => 
+  const projectsData = departmentsWithColors.flatMap(dept =>
     dept.children.map(project => ({
       ...project,
       departmentName: dept.name,
@@ -100,7 +101,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   );
 
   // Layer 3: Bills (needs ref to Project & Dept)
-  const billsData = projectsData.flatMap(project => 
+  const billsData = projectsData.flatMap(project =>
     project.children.map(bill => ({
       ...bill,
       projectName: project.name,
@@ -117,12 +118,14 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
-      
+
       const isBill = !!d.projectName;
       const isProject = !!d.departmentName && !d.projectName;
+      // Default to Dept if not Bill or Project
       const isDept = !d.departmentName && !d.projectName;
 
       if (isBill) {
+        // --- Bill Tooltip ---
         return (
           <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
             <p className="font-semibold text-foreground text-sm mb-1">{d.name}</p>
@@ -139,42 +142,97 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
                 <span className="text-muted-foreground">Received:</span>
                 <span className="font-medium text-success">{formatCurrency(d.received)}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Remaining:</span>
+                <span className="font-medium text-warning">{formatCurrency(d.remaining)}</span>
+              </div>
             </div>
           </div>
         );
       } else if (isProject) {
-        const pct = d.value > 0 
-            ? Math.round((d.children?.reduce((sum: number, b: any) => sum + (b.received || 0), 0) / d.value) * 100) 
-            : 0;
+        // --- Project Tooltip ---
+        const totalBills = d.children?.length || 0;
+        const totalValue = d.value || 0;
+
+        // Calculate sums from children bills
+        const receivedAmount = d.children?.reduce((sum: number, b: any) => sum + (b.received || 0), 0) || 0;
+        const remainingAmount = d.children?.reduce((sum: number, b: any) => sum + (b.remaining || 0), 0) || 0;
+
+        const receivedPct = totalValue > 0 ? Math.round((receivedAmount / totalValue) * 100) : 0;
+        const remainingPct = totalValue > 0 ? Math.round((remainingAmount / totalValue) * 100) : 0;
 
         return (
-            <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+          <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[220px]">
             <p className="font-semibold text-foreground text-sm mb-1">{d.name}</p>
             <p className="text-xs text-muted-foreground mb-2">Dept: {d.departmentName}</p>
             <div className="space-y-1 text-xs border-t border-border pt-2">
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Value:</span>
-                <span className="font-medium text-primary">{formatCurrency(d.value)}</span>
+                <span className="text-muted-foreground">Total Value:</span>
+                <span className="font-medium text-primary">{formatCurrency(totalValue)}</span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Progress:</span>
-                <span className="font-medium text-foreground">{pct}%</span>
+                <span className="text-muted-foreground">Received:</span>
+                <span className="font-medium text-success">
+                  {formatCurrency(receivedAmount)} ({receivedPct}%)
+                </span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Remaining:</span>
+                <span className="font-medium text-warning">
+                  {formatCurrency(remainingAmount)} ({remainingPct}%)
+                </span>
+              </div>
+              <div className="pt-1 border-t border-border/50 mt-1">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Bills:</span>
+                  <span className="font-medium text-foreground">{totalBills}</span>
+                </div>
               </div>
             </div>
           </div>
         );
       } else {
+        // --- Department Tooltip ---
+        const totalProjects = d.children?.length || 0;
+        const totalValue = d.value || 0;
+
+        // Calculate deep sums (Dept -> Projects -> Bills)
+        const totalReceived = d.children?.reduce((acc: number, proj: any) => {
+          return acc + (proj.children?.reduce((pAcc: number, bill: any) => pAcc + (bill.received || 0), 0) || 0);
+        }, 0) || 0;
+
+        const totalRemaining = d.children?.reduce((acc: number, proj: any) => {
+          return acc + (proj.children?.reduce((pAcc: number, bill: any) => pAcc + (bill.remaining || 0), 0) || 0);
+        }, 0) || 0;
+
+        const receivedPct = totalValue > 0 ? Math.round((totalReceived / totalValue) * 100) : 0;
+        const remainingPct = totalValue > 0 ? Math.round((totalRemaining / totalValue) * 100) : 0;
+
         return (
-          <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+          <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[220px]">
             <p className="font-semibold text-foreground text-sm mb-2">{d.name}</p>
             <div className="space-y-1 text-xs">
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Total Value:</span>
-                <span className="font-medium text-primary">{formatCurrency(d.value)}</span>
+                <span className="font-medium text-primary">{formatCurrency(totalValue)}</span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Projects:</span>
-                <span className="font-medium text-foreground">{d.children?.length || 0}</span>
+                <span className="text-muted-foreground">Received:</span>
+                <span className="font-medium text-success">
+                  {formatCurrency(totalReceived)} ({receivedPct}%)
+                </span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Remaining:</span>
+                <span className="font-medium text-warning">
+                  {formatCurrency(totalRemaining)} ({remainingPct}%)
+                </span>
+              </div>
+              <div className="pt-1 border-t border-border/50 mt-1">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Projects:</span>
+                  <span className="font-medium text-foreground">{totalProjects}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -187,17 +245,17 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   const renderCustomLabel = (props: any) => {
     const { cx, cy, midAngle, outerRadius, name, percent } = props;
     if (percent <= 0.05) return null;
-    
+
     const RADIAN = Math.PI / 180;
-    const extraDistance = isExpanded ? 70 : 50; 
+    const extraDistance = isExpanded ? 70 : 50;
     const radius = outerRadius + extraDistance;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    
+
     const displayName = name.length > 15 ? name.substring(0, 15) + '...' : name;
     const textWidth = displayName.length * 6.5;
     const padding = 6;
-    
+
     return (
       <g>
         <rect
@@ -263,7 +321,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
           </div>
         </div>
       </div>
-      
+
       {loading ? (
         <div className="flex items-center justify-center flex-1">
           <Skeleton className="h-64 w-64 rounded-full" />
@@ -289,7 +347,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
                   paddingAngle={2}
                 >
                   {departmentsWithColors.map((entry, index) => (
-                    <Cell key={`dept-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                    <Cell key={`dept-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2} />
                   ))}
                 </Pie>
 
@@ -307,7 +365,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
                     labelLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1, strokeDasharray: '3 3' }}
                   >
                     {projectsData.map((entry, index) => (
-                      <Cell key={`proj-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1}/>
+                      <Cell key={`proj-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1} />
                     ))}
                   </Pie>
                 )}
@@ -324,7 +382,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
                     paddingAngle={1}
                   >
                     {billsData.map((entry, index) => (
-                      <Cell key={`bill-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1}/>
+                      <Cell key={`bill-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1} />
                     ))}
                   </Pie>
                 )}
@@ -334,7 +392,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
             </ResponsiveContainer>
           </div>
 
-          {/* Nested Legend Section - Displays All Layers */}
+          {/* Nested Legend Section */}
           {isExpanded && (
             <div className="w-[30%] flex flex-col min-h-0 border-l border-border/50 pl-4">
               <h4 className="text-sm font-semibold text-foreground mb-3 flex-shrink-0">Distribution Detail</h4>
@@ -343,10 +401,10 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
                   <div key={`legend-dept-${deptIdx}`} className="space-y-1">
                     {/* Level 1: Department */}
                     <div className="flex items-center gap-2 p-2 bg-secondary/20 rounded-md border border-border/50">
-                    
+                      
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: dept.fill }} />
                       <div className="flex-1 min-w-0">
-                         <p className="text-sm font-semibold truncate" title={dept.name}>{dept.name}</p>
+                        <p className="text-sm font-semibold truncate" title={dept.name}>{dept.name}</p>
                       </div>
                       <span className="text-xs font-medium text-primary">{formatCurrency(dept.value)}</span>
                     </div>
