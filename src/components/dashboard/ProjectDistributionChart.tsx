@@ -2,11 +2,11 @@
 
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { PieChartIcon } from 'lucide-react';
+import { PieChartIcon, ChevronRight, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import IndexCounter from './IndexCounter';
 
+// --- Types ---
 interface BillData {
   name: string;
   value: number;
@@ -14,6 +14,9 @@ interface BillData {
   received: number;
   remaining: number;
   percentReceived: number;
+  // flattening helpers
+  projectName?: string;
+  departmentName?: string;
 }
 
 interface ProjectData {
@@ -21,15 +24,24 @@ interface ProjectData {
   value: number;
   fill: string;
   children: BillData[];
+  // flattening helpers
+  departmentName?: string;
+}
+
+interface DepartmentData {
+  name: string;
+  value: number;
+  fill: string;
+  children: ProjectData[];
 }
 
 interface ProjectDistributionChartProps {
-  data: ProjectData[];
+  data: DepartmentData[];
   loading?: boolean;
   isExpanded?: boolean;
 }
 
-// Define a fixed color palette with 8 distinct colors
+// Fixed color palette for Departments
 const COLOR_PALETTE = [
   { hue: 210, name: 'Blue' },      // Blue
   { hue: 160, name: 'Teal' },      // Teal
@@ -42,115 +54,127 @@ const COLOR_PALETTE = [
 ];
 
 export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectDistributionChartProps) {
-  // Assign colors from palette to projects
-  const projectsWithColors = data.map((project, idx) => {
+  
+  // 1. Assign Colors to Departments
+  const departmentsWithColors = data.map((dept, idx) => {
     const colorIndex = idx % COLOR_PALETTE.length;
     const { hue } = COLOR_PALETTE[colorIndex];
     
+    // Dept Color (Inner Ring)
+    const deptFill = `hsl(${hue}, 70%, 45%)`;
+
     return {
-      ...project,
-      fill: `hsl(${hue}, 70%, 50%)`,
-      children: project.children.map((bill, billIdx) => {
-        // Create shades for bills: lighter shades for more bills
-        const totalBills = project.children.length;
-        const lightnessStep = 15 / Math.max(totalBills, 1);
-        const lightness = 55 + (billIdx * lightnessStep);
-        
+      ...dept,
+      fill: deptFill,
+      children: dept.children.map((project, projIdx) => {
+        // Project Color (Middle Ring)
+        const projFill = `hsl(${hue}, 65%, ${projIdx % 2 === 0 ? 55 : 60}%)`;
+
         return {
-          ...bill,
-          fill: `hsl(${hue}, 65%, ${Math.min(lightness, 75)}%)`,
+          ...project,
+          fill: projFill,
+          children: project.children.map((bill, billIdx) => {
+            // Bill Color (Outer Ring)
+            const totalBills = project.children.length;
+            const lightnessStep = 15 / Math.max(totalBills, 1);
+            const lightness = 65 + (billIdx * lightnessStep);
+            
+            return {
+              ...bill,
+              fill: `hsl(${hue}, 60%, ${Math.min(lightness, 85)}%)`,
+            };
+          }),
         };
       }),
     };
   });
 
-  // Flatten bills for outer ring with project reference
-  const billsData = projectsWithColors.flatMap(project => 
+  // 2. Flatten for Render Layers
+  
+  // Layer 2: Projects (needs ref to Dept)
+  const projectsData = departmentsWithColors.flatMap(dept => 
+    dept.children.map(project => ({
+      ...project,
+      departmentName: dept.name,
+    }))
+  );
+
+  // Layer 3: Bills (needs ref to Project & Dept)
+  const billsData = projectsData.flatMap(project => 
     project.children.map(bill => ({
       ...bill,
       projectName: project.name,
+      departmentName: project.departmentName,
     }))
   );
 
   const formatCurrency = (value: number) => {
-    // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
     const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value));
     return `৳${formatted}`;
   };
 
+  // --- Tooltip Logic ---
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const d = payload[0].payload;
       
-      // Check if it's a bill (has projectName) or project
-      if (data.projectName) {
-        // Bill tooltip
+      const isBill = !!d.projectName;
+      const isProject = !!d.departmentName && !d.projectName;
+      const isDept = !d.departmentName && !d.projectName;
+
+      if (isBill) {
         return (
           <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
-            <p className="font-semibold text-foreground text-sm mb-1">
-              {data.name}
-            </p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Project: {data.projectName}
-            </p>
-            <div className="space-y-1 text-xs">
+            <p className="font-semibold text-foreground text-sm mb-1">{d.name}</p>
+            <div className="flex flex-col gap-0.5 mb-2">
+              <span className="text-xs text-muted-foreground">Dept: {d.departmentName}</span>
+              <span className="text-xs text-muted-foreground">Proj: {d.projectName}</span>
+            </div>
+            <div className="space-y-1 text-xs border-t border-border pt-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Bill Amount:</span>
-                <span className="font-medium text-foreground">{formatCurrency(data.value)}</span>
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium text-foreground">{formatCurrency(d.value)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Received:</span>
-                <span className="font-medium text-success">{formatCurrency(data.received)}</span>
+                <span className="font-medium text-success">{formatCurrency(d.received)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Remaining:</span>
-                <span className="font-medium text-warning">{formatCurrency(data.remaining)}</span>
+            </div>
+          </div>
+        );
+      } else if (isProject) {
+        const pct = d.value > 0 
+            ? Math.round((d.children?.reduce((sum: number, b: any) => sum + (b.received || 0), 0) / d.value) * 100) 
+            : 0;
+
+        return (
+            <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+            <p className="font-semibold text-foreground text-sm mb-1">{d.name}</p>
+            <p className="text-xs text-muted-foreground mb-2">Dept: {d.departmentName}</p>
+            <div className="space-y-1 text-xs border-t border-border pt-2">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Value:</span>
+                <span className="font-medium text-primary">{formatCurrency(d.value)}</span>
               </div>
-              <div className="pt-1 border-t border-border mt-1">
-                <span className="font-semibold text-primary">{data.percentReceived}% Paid</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Progress:</span>
+                <span className="font-medium text-foreground">{pct}%</span>
               </div>
             </div>
           </div>
         );
       } else {
-        // Project tooltip
-        const totalBills = data.children?.length || 0;
-        const receivedBills = data.children?.filter((bill: BillData) => bill.percentReceived === 100).length || 0;
-        const totalAmount = data.value || 0;
-        const receivedAmount = data.children?.reduce((sum: number, bill: BillData) => sum + bill.received, 0) || 0;
-        const remainingAmount = data.children?.reduce((sum: number, bill: BillData) => sum + bill.remaining, 0) || 0;
-        const receivedPercentage = totalAmount > 0 ? Math.round((receivedAmount / totalAmount) * 100) : 0;
-        const remainingPercentage = totalAmount > 0 ? Math.round((remainingAmount / totalAmount) * 100) : 0;
-        
         return (
-          <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[220px]">
-            <p className="font-semibold text-foreground text-sm mb-2">
-              {data.name}
-            </p>
-            <div className="space-y-1.5 text-xs">
+          <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+            <p className="font-semibold text-foreground text-sm mb-2">{d.name}</p>
+            <div className="space-y-1 text-xs">
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Total Value:</span>
-                <span className="font-medium text-primary">{formatCurrency(totalAmount)}</span>
+                <span className="font-medium text-primary">{formatCurrency(d.value)}</span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Received:</span>
-                <span className="font-medium text-success">
-                  {formatCurrency(receivedAmount)} ({receivedPercentage}%)
-                </span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Remaining:</span>
-                <span className="font-medium text-warning">
-                  {formatCurrency(remainingAmount)} ({remainingPercentage}%)
-                </span>
-              </div>
-              <div className="pt-1.5 border-t border-border mt-1.5">
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Bills:</span>
-                  <span className="font-medium text-foreground">
-                    {receivedBills}/{totalBills} ({receivedPercentage}%)
-                  </span>
-                </div>
+                <span className="text-muted-foreground">Projects:</span>
+                <span className="font-medium text-foreground">{d.children?.length || 0}</span>
               </div>
             </div>
           </div>
@@ -160,16 +184,12 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
     return null;
   };
 
-  // Custom label component with white background
   const renderCustomLabel = (props: any) => {
     const { cx, cy, midAngle, outerRadius, name, percent } = props;
-    
     if (percent <= 0.05) return null;
     
     const RADIAN = Math.PI / 180;
-    // Position labels FAR outside the chart - beyond both rings
-    // Add extra distance to clear the outer ring completely
-    const extraDistance = isExpanded ? 80 : 60;
+    const extraDistance = isExpanded ? 70 : 50; 
     const radius = outerRadius + extraDistance;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -206,6 +226,15 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
     );
   };
 
+  // --- Radius Configuration ---
+  const R_DEPT_IN = 40, R_DEPT_OUT = 70;
+  const R_PROJ_IN = 75, R_PROJ_OUT = 105;
+  const R_BILL_IN = 110, R_BILL_OUT = 140;
+
+  const E_R_DEPT_IN = 60, E_R_DEPT_OUT = 100;
+  const E_R_PROJ_IN = 105, E_R_PROJ_OUT = 155;
+  const E_R_BILL_IN = 160, E_R_BILL_OUT = 210;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -219,7 +248,11 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
       <div className="flex items-center gap-2 mb-4 flex-shrink-0">
         <PieChartIcon className="w-5 h-5 text-primary" />
         <h3 className="font-semibold text-foreground">Project Distribution</h3>
-        <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground hidden sm:flex">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-slate-500" />
+            <span>Depts</span>
+          </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full border-2 border-primary" />
             <span>Projects</span>
@@ -237,58 +270,61 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
         </div>
       ) : data.length === 0 ? (
         <div className="flex items-center justify-center flex-1">
-          <p className="text-sm text-muted-foreground">No project data available</p>
+          <p className="text-sm text-muted-foreground">No data available</p>
         </div>
       ) : (
         <div className={cn("flex gap-6 flex-1 min-h-0", isExpanded ? "" : "justify-center")}>
-          {/* Chart Section - Full width in normal, 70% in expanded */}
+          {/* Chart Section */}
           <div className={cn("min-h-0", isExpanded ? "w-[70%]" : "w-full")}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 60, right: 100, bottom: 60, left: 100 }}>
-                {/* Inner Ring - Projects */}
+                {/* 1. Inner Ring: Departments */}
                 <Pie
-                  data={projectsWithColors}
+                  data={departmentsWithColors}
                   dataKey="value"
                   cx="50%"
                   cy="50%"
-                  innerRadius={isExpanded ? 100 : 60}
-                  outerRadius={isExpanded ? 160 : 100}
+                  innerRadius={isExpanded ? E_R_DEPT_IN : R_DEPT_IN}
+                  outerRadius={isExpanded ? E_R_DEPT_OUT : R_DEPT_OUT}
                   paddingAngle={2}
-                  label={renderCustomLabel}
-                  labelLine={{
-                    stroke: 'hsl(var(--border))',
-                    strokeWidth: 1,
-                    strokeDasharray: '3 3'
-                  }}
                 >
-                  {projectsWithColors.map((entry, index) => (
-                    <Cell 
-                      key={`project-${index}`} 
-                      fill={entry.fill}
-                      stroke="hsl(var(--background))"
-                      strokeWidth={2}
-                    />
+                  {departmentsWithColors.map((entry, index) => (
+                    <Cell key={`dept-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
                   ))}
                 </Pie>
 
-                {/* Outer Ring - Bills */}
+                {/* 2. Middle Ring: Projects */}
+                {projectsData.length > 0 && (
+                  <Pie
+                    data={projectsData}
+                    dataKey="value"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={isExpanded ? E_R_PROJ_IN : R_PROJ_IN}
+                    outerRadius={isExpanded ? E_R_PROJ_OUT : R_PROJ_OUT}
+                    paddingAngle={1}
+                    label={renderCustomLabel}
+                    labelLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                  >
+                    {projectsData.map((entry, index) => (
+                      <Cell key={`proj-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1}/>
+                    ))}
+                  </Pie>
+                )}
+
+                {/* 3. Outer Ring: Bills */}
                 {billsData.length > 0 && (
                   <Pie
                     data={billsData}
                     dataKey="value"
                     cx="50%"
                     cy="50%"
-                    innerRadius={isExpanded ? 165 : 105}
-                    outerRadius={isExpanded ? 220 : 140}
+                    innerRadius={isExpanded ? E_R_BILL_IN : R_BILL_IN}
+                    outerRadius={isExpanded ? E_R_BILL_OUT : R_BILL_OUT}
                     paddingAngle={1}
                   >
                     {billsData.map((entry, index) => (
-                      <Cell 
-                        key={`bill-${index}`} 
-                        fill={entry.fill}
-                        stroke="hsl(var(--background))"
-                        strokeWidth={1}
-                      />
+                      <Cell key={`bill-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1}/>
                     ))}
                   </Pie>
                 )}
@@ -298,33 +334,45 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
             </ResponsiveContainer>
           </div>
 
-          {/* Legend Section - 30% width, ONLY in expanded mode */}
+          {/* Nested Legend Section - Displays All Layers */}
           {isExpanded && (
-            <div className="w-[30%] flex flex-col min-h-0">
-              <h4 className="text-sm font-semibold text-foreground mb-3 flex-shrink-0">Projects</h4>
-              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {projectsWithColors.map((project, idx) => (
-                  <div key={idx} className="relative flex items-start gap-2 group hover:bg-secondary/50 p-3 rounded-md transition-colors border border-transparent hover:border-border">
-                    <IndexCounter index={idx} position='end'/>
-                    <div 
-                      className="w-4 h-4 rounded-full flex-shrink-0 mt-0.5 border-2" 
-                      style={{ 
-                        backgroundColor: project.fill,
-                        borderColor: project.fill
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-foreground font-medium truncate" title={project.name}>
-                        {project.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {project.children.length} {project.children.length === 1 ? 'bill' : 'bills'}
-                        </span>
+            <div className="w-[30%] flex flex-col min-h-0 border-l border-border/50 pl-4">
+              <h4 className="text-sm font-semibold text-foreground mb-3 flex-shrink-0">Distribution Detail</h4>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                {departmentsWithColors.map((dept, deptIdx) => (
+                  <div key={`legend-dept-${deptIdx}`} className="space-y-1">
+                    {/* Level 1: Department */}
+                    <div className="flex items-center gap-2 p-2 bg-secondary/20 rounded-md border border-border/50">
+                    
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: dept.fill }} />
+                      <div className="flex-1 min-w-0">
+                         <p className="text-sm font-semibold truncate" title={dept.name}>{dept.name}</p>
                       </div>
-                      <p className="text-xs text-primary font-medium mt-0.5">
-                        {formatCurrency(project.value)}
-                      </p>
+                      <span className="text-xs font-medium text-primary">{formatCurrency(dept.value)}</span>
+                    </div>
+
+                    {/* Level 2: Projects */}
+                    <div className="pl-4 space-y-2 border-l-2 border-dashed border-border ml-2.5 mt-1 pt-1">
+                      {dept.children.map((proj, projIdx) => (
+                        <div key={`legend-proj-${deptIdx}-${projIdx}`} className="space-y-1">
+                          <div className="flex items-center gap-2 p-1.5 hover:bg-secondary/40 rounded-sm transition-colors group">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: proj.fill }} />
+                            <span className="text-xs font-medium truncate flex-1 group-hover:text-primary transition-colors">{proj.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{formatCurrency(proj.value)}</span>
+                          </div>
+
+                          {/* Level 3: Bills */}
+                          <div className="pl-3 space-y-0.5 border-l border-border/40 ml-1">
+                            {proj.children.map((bill, billIdx) => (
+                              <div key={`legend-bill-${deptIdx}-${projIdx}-${billIdx}`} className="flex items-center gap-2 p-1 hover:bg-secondary/20 rounded-sm">
+                                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-70" style={{ backgroundColor: bill.fill }} />
+                                <span className="text-[10px] text-muted-foreground truncate flex-1" title={bill.name}>{bill.name}</span>
+                                <span className="text-[10px] text-muted-foreground/70">{formatCurrency(bill.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

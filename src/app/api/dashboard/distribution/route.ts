@@ -34,9 +34,16 @@ export async function GET(request: NextRequest) {
       if (!isNaN(parsed)) where.id = parsed;
     }
 
+    // Fetch projects with their department and bills
     const projects = await prisma.project.findMany({
       where,
       include: {
+        department: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         bills: {
           select: {
             id: true,
@@ -50,34 +57,60 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Create sunburst data structure
-    const sunburstData = projects.map((project, idx) => {
-      const projectTotal = Number(project.totalProjectValue) || 0;
+    // Group by Department
+    const departmentMap = new Map();
 
-      // Generate color based on index using golden angle for good distribution
+    projects.forEach((project) => {
+      // Handle projects with no department
+      const deptId = project.department?.id || 'unassigned';
+      const deptName = project.department?.name || 'Unassigned';
+
+      if (!departmentMap.has(deptId)) {
+        departmentMap.set(deptId, {
+          id: deptId,
+          name: deptName,
+          projects: []
+        });
+      }
+      departmentMap.get(deptId).projects.push(project);
+    });
+
+    // Create 3-level Sunburst structure: Department -> Project -> Bill
+    const sunburstData = Array.from(departmentMap.values()).map((dept, idx) => {
+      const deptTotal = dept.projects.reduce((sum: number, p: any) => sum + (Number(p.totalProjectValue) || 0), 0);
+
+      // Generate base hue for Department using golden angle
       const hue = (idx * 137.5) % 360;
 
       return {
-        name: project.projectName,
-        value: projectTotal || 1, // Use 1 as minimum to show project even without value
-        fill: `hsl(${hue}, 70%, 50%)`,
-        children: project.bills.map((bill, billIdx) => {
-          // Calculate lightness based on bill status
-          const received = Number(bill.receivedAmount) || 0;
-          const total = Number(bill.billAmount) || 0;
-          const percentReceived = total > 0 ? (received / total) * 100 : 0;
-
-          // Color intensity based on payment status
-          // Fully paid: lighter, unpaid: darker
-          const lightness = 45 + (percentReceived / 100) * 20; // 45% to 65%
+        name: dept.name,
+        value: deptTotal || 1, // Minimum 1 for visibility
+        fill: `hsl(${hue}, 70%, 45%)`, // Darker base for center
+        children: dept.projects.map((project: any) => {
+          const projectTotal = Number(project.totalProjectValue) || 0;
 
           return {
-            name: bill.billName || bill.slNo || `Bill ${billIdx + 1}`,
-            value: Number(bill.billAmount),
-            fill: `hsl(${hue}, 65%, ${lightness}%)`,
-            received: Number(bill.receivedAmount) || 0,
-            remaining: Number(bill.remainingAmount) || 0,
-            percentReceived: Math.round(percentReceived),
+            name: project.projectName,
+            value: projectTotal || 1,
+            fill: `hsl(${hue}, 70%, 55%)`, // Medium shade for project ring
+            children: project.bills.map((bill: any, billIdx: number) => {
+              const received = Number(bill.receivedAmount) || 0;
+              const total = Number(bill.billAmount) || 0;
+              const percentReceived = total > 0 ? (received / total) * 100 : 0;
+
+              // Lightness calculation: Paid bills are lighter, unpaid darker
+              // Range: 65% to 90% lightness
+              const lightness = 65 + (percentReceived / 100) * 25;
+
+              return {
+                name: bill.billName || bill.slNo || `Bill ${billIdx + 1}`,
+                value: Number(bill.billAmount),
+                fill: `hsl(${hue}, 75%, ${lightness}%)`,
+                received: Number(bill.receivedAmount) || 0,
+                remaining: Number(bill.remainingAmount) || 0,
+                percentReceived: Math.round(percentReceived),
+              };
+            }),
           };
         }),
       };

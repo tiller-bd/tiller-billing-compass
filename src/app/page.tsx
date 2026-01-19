@@ -232,7 +232,7 @@ export default function DashboardPage() {
       {/* Expanded View Modal - Full screen on mobile */}
       {expandedCard && (
         <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
-          <div className="bg-card border w-full max-w-6xl h-[90vh] md:h-[80vh] rounded-xl shadow-2xl relative p-4 md:p-8">
+          <div className="bg-card  w-full max-w-6xl h-[90vh] md:h-[80vh] rounded-xl shadow-2xl relative p-1 md:p-3">
             <Button variant="ghost" size="icon" className="absolute top-2 right-2 md:top-4 md:right-4" onClick={() => setExpandedCard(null)}>
               <X className="h-5 w-5" />
             </Button>
