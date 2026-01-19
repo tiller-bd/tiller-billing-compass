@@ -42,7 +42,10 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
   const [visibleColumns, setVisibleColumns] = useState({
     client: true,
     department: true,
-    received: true
+    received: true,
+    schedule: true,
+    allocation: true,
+    status: true
   });
 
   // Prepare data with computed fields for sorting
@@ -60,14 +63,14 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
   const { sortedData, sortConfig, handleSort } = useSorting(billsWithComputed);
 
   useEffect(() => {
-    const saved = localStorage.getItem('billing_col_visibility_v5');
+    const saved = localStorage.getItem('billing_col_visibility_v6');
     if (saved) setVisibleColumns(JSON.parse(saved));
   }, []);
 
   const toggleCol = (col: keyof typeof visibleColumns) => {
     const next = { ...visibleColumns, [col]: !visibleColumns[col] };
     setVisibleColumns(next);
-    localStorage.setItem('billing_col_visibility_v5', JSON.stringify(next));
+    localStorage.setItem('billing_col_visibility_v6', JSON.stringify(next));
   };
 
   const formatCurrency = (val: number) => {
@@ -201,18 +204,24 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
               <th className="p-5">
                 <SortableHeader label="Milestone & Project" sortKey="_projectName" currentSort={sortConfig} onSort={handleSort} />
               </th>
-              <th className="p-5">
-                <SortableHeader label="Schedule" sortKey="_tentativeDate" currentSort={sortConfig} onSort={handleSort} />
-              </th>
-              <th className="p-5 text-center">
-                <SortableHeader label="Alloc %" sortKey="_billPercent" currentSort={sortConfig} onSort={handleSort} className="justify-center" />
-              </th>
+              {visibleColumns.schedule && (
+                <th className="p-5">
+                  <SortableHeader label="Schedule" sortKey="_tentativeDate" currentSort={sortConfig} onSort={handleSort} />
+                </th>
+              )}
+              {visibleColumns.allocation && (
+                <th className="p-5 text-center">
+                  <SortableHeader label="Allocation %" sortKey="_billPercent" currentSort={sortConfig} onSort={handleSort} className="justify-center" />
+                </th>
+              )}
               <th className="p-5">
                 <SortableHeader label="Amount" sortKey="_billAmount" currentSort={sortConfig} onSort={handleSort} />
               </th>
-              <th className="p-5">
-                <SortableHeader label="Status" sortKey="status" currentSort={sortConfig} onSort={handleSort} />
-              </th>
+              {visibleColumns.status && (
+                <th className="p-5">
+                  <SortableHeader label="Status" sortKey="status" currentSort={sortConfig} onSort={handleSort} />
+                </th>
+              )}
               <th className="p-5 text-right">Actions</th>
             </tr>
           </thead>
@@ -243,45 +252,55 @@ export function BillingTable({ bills, onProjectNavigate, onRefresh }: BillingTab
                     </div>
                   </td>
                   
-                  <td className="p-5">
-                    <div className="flex flex-col gap-1.5 text-[11px] font-bold">
-                      <div className="flex items-center gap-2 text-slate-500">
-                        <CalendarDays size={12} /> TGT: {bill.tentativeBillingDate ? format(new Date(bill.tentativeBillingDate), 'MMM dd, yyyy') : 'N/A'}
-                      </div>
-                      {bill.receivedDate && (
-                        <div className="flex items-center gap-2 text-success">
-                          <CheckCircle2 size={12} /> REC: {format(new Date(bill.receivedDate), 'MMM dd, yyyy')}
+                  {visibleColumns.schedule && (
+                    <td className="p-5">
+                      <div className="flex flex-col gap-1.5 text-[11px] font-bold">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <CalendarDays size={12} /> TGT: {bill.tentativeBillingDate ? format(new Date(bill.tentativeBillingDate), 'MMM dd, yyyy') : 'N/A'}
                         </div>
-                      )}
-                    </div>
-                  </td>
+                        {bill.receivedDate && (
+                          <div className="flex items-center gap-2 text-success">
+                            <CheckCircle2 size={12} /> REC: {format(new Date(bill.receivedDate), 'MMM dd, yyyy')}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
 
-                  <td className="p-5 text-center">
-                    <div className="flex flex-col items-center">
-                      <span className="font-black text-slate-400 text-[10px]">ALLOC: {bill.billPercent}%</span>
-                      {recAmt > 0 && <span className="font-black text-success text-[10px]">RECV: {recPctOfProject}%</span>}
-                      {remaining > 0 && <span className="font-black text-destructive/70 text-[10px]">REM: {remainingPctOfProject}%</span>}
-                    </div>
-                  </td>
-
-                  <td className="p-5">
-                    <div className="space-y-0.5">
-                      <p className="font-black text-foreground">DUE: {formatCurrency(billAmt)}</p>
-                      <p className={cn("text-[10px] font-black", recAmt > 0 ? "text-success" : "text-slate-300")}>
-                        REC: {formatCurrency(recAmt)}
-                      </p>
-                    </div>
-                  </td>
+                  {visibleColumns.allocation && (
+                    <td className="p-5 text-center">
+                      <span className="font-black text-lg">{bill.billPercent}%</span>
+                    </td>
+                  )}
 
                   <td className="p-5">
-                    <Badge className={cn(
-                      "font-black text-[9px] px-2.5 shadow-none",
-                      bill.status === 'PAID' ? "bg-success/10 text-success border-success/30" : 
-                      bill.status === 'PARTIAL' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-muted text-slate-400"
-                    )} variant="outline">
-                      {bill.status}
-                    </Badge>
+                    {bill.status === 'PENDING' && (
+                      <p className="font-black text-destructive">DUE: {formatCurrency(billAmt)}</p>
+                    )}
+                    {bill.status === 'PARTIAL' && (
+                      <div className="space-y-0.5">
+                        <p className="font-black text-destructive">DUE: {formatCurrency(billAmt)}</p>
+                        <p className="text-[11px] font-black text-success">
+                          REC: {formatCurrency(recAmt)} <span className="text-[10px]">({recPctOfProject}%)</span>
+                        </p>
+                      </div>
+                    )}
+                    {bill.status === 'PAID' && (
+                      <p className="font-black text-success">REC: {formatCurrency(recAmt)}</p>
+                    )}
                   </td>
+
+                  {visibleColumns.status && (
+                    <td className="p-5">
+                      <Badge className={cn(
+                        "font-black text-[9px] px-2.5 shadow-none",
+                        bill.status === 'PAID' ? "bg-success/10 text-success border-success/30" : 
+                        bill.status === 'PARTIAL' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-muted text-slate-400"
+                      )} variant="outline">
+                        {bill.status}
+                      </Badge>
+                    </td>
+                  )}
 
                   <td className="p-5">
                     <div className="flex justify-end items-center gap-2">

@@ -38,7 +38,11 @@ export function RecordPaymentDialog({ bill, totalProjectValue, onSuccess }: Reco
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-2 font-bold text-xs hover:bg-primary/5">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-8 gap-2 font-bold text-xs hover:bg-primary/5 hover:text-foreground border-primary/20"
+        >
           <Banknote size={14} /> Record Payment
         </Button>
       </DialogTrigger>
