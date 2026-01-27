@@ -1,9 +1,9 @@
 // src/app/billing/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { BillingTable, BillingTableSkeleton } from '@/components/billing/BillingTable';
 import { AddBillDialog } from '@/components/billing/AddBillDialog';
@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { ErrorDisplay } from '@/components/error/ErrorDisplay';
 import { ApiClientError, apiFetch } from '@/lib/api-client';
 import { useSharedFilters } from '@/contexts/FilterContext';
+import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
+import { MetricCard } from '@/components/dashboard/MetricCard';
 
 export default function BillingMasterPage() {
   const router = useRouter();
@@ -32,7 +34,35 @@ export default function BillingMasterPage() {
   const [status, setStatus] = useState('all');
   const [dept, setDept] = useState('all');
   const [project, setProject] = useState('all');
+  // Default to fiscal year (prioritized)
+  const [yearType, setYearType] = useState<YearType | 'all'>('all');
   const [year, setYear] = useState('all');
+
+  // Generate year options
+  const calendarYearOptions = useMemo(() => getCalendarYearOptions(), []);
+  const fiscalYearOptions = useMemo(() => getFiscalYearOptions(), []);
+
+  // Get current year options based on selected type
+  const yearOptions = yearType === 'fiscal' ? fiscalYearOptions :
+                       yearType === 'calendar' ? calendarYearOptions : [];
+
+  // Handle year type change
+  const handleYearTypeChange = (newType: YearType | 'all') => {
+    setYearType(newType);
+    if (newType === 'all') {
+      setYear('all');
+    } else if (newType === 'fiscal') {
+      setYear(getCurrentFiscalYear());
+    } else {
+      setYear(new Date().getFullYear().toString());
+    }
+  };
+
+  // Construct year parameter for API
+  const getYearParam = (): string => {
+    if (yearType === 'all' || year === 'all') return 'all';
+    return yearType === 'fiscal' ? `fy-${year}` : `cal-${year}`;
+  };
 
   // Detect ?new=true from Sidebar
   useEffect(() => {
@@ -50,7 +80,8 @@ export default function BillingMasterPage() {
       if (status !== 'all') params.append('status', status);
       if (dept !== 'all') params.append('departmentId', dept);
       if (project !== 'all') params.append('projectId', project);
-      if (year !== 'all') params.append('year', year);
+      const yearParam = getYearParam();
+      if (yearParam !== 'all') params.append('year', yearParam);
 
       const data = await apiFetch(`/api/bills?${params.toString()}`);
       setBills(data as any);
@@ -62,22 +93,81 @@ export default function BillingMasterPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, dept, project, year]);
+  }, [debouncedSearch, status, dept, project, yearType, year]);
 
+  // Fetch filter options when year changes
   useEffect(() => {
-    Promise.all([
-      apiFetch('/api/departments'),
-      apiFetch('/api/projects')
-    ]).then(([depts, projs]) => {
-      setDepartments(depts as any);
-      setProjects(projs as any);
-    }).catch(err => console.error("Failed to fetch filter data:", err));
-  }, []);
+    async function fetchFilterOptions() {
+      try {
+        const yearParam = getYearParam();
+        const yearQuery = yearParam !== 'all' ? `?year=${yearParam}` : '';
+
+        const [depts, projs] = await Promise.all([
+          apiFetch(`/api/departments${yearQuery}`),
+          apiFetch(`/api/projects${yearQuery}`)
+        ]);
+
+        const newDepartments = depts as any[];
+        const newProjects = projs as any[];
+
+        setDepartments(newDepartments);
+        setProjects(newProjects);
+
+        // Reset selections if current value is no longer available
+        if (dept !== 'all' && !newDepartments.some((d: any) => d.id.toString() === dept)) {
+          setDept('all');
+        }
+        if (project !== 'all' && !newProjects.some((p: any) => p.id.toString() === project)) {
+          setProject('all');
+        }
+      } catch (err) {
+        console.error("Failed to fetch filter data:", err);
+      }
+    }
+    fetchFilterOptions();
+  }, [yearType, year]);
 
   useEffect(() => {
     const timer = setTimeout(fetchBills, 400);
     return () => clearTimeout(timer);
   }, [fetchBills]);
+
+  // Calculate metrics from filtered bills
+  const metrics = useMemo(() => {
+    // Total Budget = sum of ALL bills' billAmount
+    const totalBudget = bills.reduce(
+      (sum: number, b: any) => sum + Number(b.billAmount || 0),
+      0
+    );
+
+    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
+    const totalReceived = bills
+      .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
+      .reduce((sum: number, b: any) => sum + Number(b.receivedAmount || 0), 0);
+
+    // Total Remaining = sum of PENDING bills' billAmount
+    const totalRemaining = bills
+      .filter((b: any) => b.status === 'PENDING')
+      .reduce((sum: number, b: any) => sum + Number(b.billAmount || 0), 0);
+
+    // Collection percentage
+    const collectionPercent = totalBudget > 0
+      ? Math.round((totalReceived / totalBudget) * 100)
+      : 0;
+
+    return {
+      totalBudget,
+      totalReceived,
+      totalRemaining,
+      collectionPercent,
+      billCount: bills.length,
+    };
+  }, [bills]);
+
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
+    return `৳${formatted}`;
+  };
 
   return (
     <DashboardLayout title="Billing" >
@@ -100,9 +190,42 @@ export default function BillingMasterPage() {
           </div>
         </div>
 
+        {/* Summary Metrics */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <MetricCard
+            loading={loading}
+            title="Total Budget"
+            value={formatCurrency(metrics.totalBudget)}
+            icon={Wallet}
+            variant="primary"
+          />
+          <MetricCard
+            loading={loading}
+            title="Total Received"
+            value={formatCurrency(metrics.totalReceived)}
+            description={`${metrics.collectionPercent}% collected`}
+            icon={TrendingUp}
+            variant="success"
+          />
+          <MetricCard
+            loading={loading}
+            title="Total Pending"
+            value={formatCurrency(metrics.totalRemaining)}
+            description={`${100 - metrics.collectionPercent}% remaining`}
+            icon={TrendingDown}
+            variant="warning"
+          />
+          <MetricCard
+            loading={loading}
+            title="Total Bills"
+            value={metrics.billCount.toString()}
+            icon={Wallet}
+          />
+        </div>
+
         {/* Filter Bar - Scrollable on mobile */}
         <div className="glass-card rounded-2xl border-border/50 shadow-sm p-3 md:p-4 overflow-x-auto">
-          <div className="flex md:grid md:grid-cols-4 gap-2 md:gap-3 min-w-max md:min-w-0">
+          <div className="flex md:grid md:grid-cols-5 gap-2 md:gap-3 min-w-max md:min-w-0">
             <Select value={project} onValueChange={setProject}>
               <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-32 md:w-full text-xs md:text-sm">
                 <SelectValue placeholder="Project" />
@@ -136,17 +259,32 @@ export default function BillingMasterPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={year} onValueChange={setYear}>
+            {/* Year Type Selector - Fiscal prioritized */}
+            <Select value={yearType} onValueChange={(v) => handleYearTypeChange(v as YearType | 'all')}>
               <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-24 md:w-full text-xs md:text-sm">
-                <SelectValue placeholder="Year" />
+                <SelectValue placeholder="Year Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Years</SelectItem>
-                {[2024, 2025, 2026].map(y => (
-                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                ))}
+                <SelectItem value="fiscal">Fiscal</SelectItem>
+                <SelectItem value="calendar">Calendar</SelectItem>
               </SelectContent>
             </Select>
+            {/* Year Value Selector - Only shown when year type is selected */}
+            {yearType !== 'all' && (
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-24 md:w-full text-xs md:text-sm">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {yearType === 'fiscal' ? `FY ${y}` : y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 

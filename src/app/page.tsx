@@ -28,7 +28,13 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
-  const { departmentId, clientId, projectId, selectedYear } = useSharedFilters();
+  const { departmentId, clientId, projectId, yearType, selectedYear } = useSharedFilters();
+
+  // Construct year parameter with prefix for API calls
+  // "all" means no year filter
+  const yearParam = selectedYear === 'all'
+    ? 'all'
+    : (yearType === 'fiscal' ? `fy-${selectedYear}` : `cal-${selectedYear}`);
 
   // Individual Loading States for Refetching
   const [loadingStates, setLoadingStates] = useState({
@@ -85,7 +91,7 @@ export default function DashboardPage() {
     updateError('metrics', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/metrics?${params}`);
+      const data = await apiFetch(`/api/dashboard/metrics?year=${yearParam}&${params}`);
       setMetrics(data);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -94,14 +100,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('metrics', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
-  const fetchRevenue = useCallback(async (year: string) => {
+  const fetchRevenue = useCallback(async () => {
     updateLoading('revenue', true);
     updateError('revenue', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/revenue?year=${year}&${params}`);
+      const data = await apiFetch(`/api/dashboard/revenue?year=${yearParam}&${params}`);
       setRevenue(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -110,14 +116,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('revenue', false);
     }
-  }, [selectedYear, departmentId, clientId, projectId]);
+  }, [yearParam, departmentId, clientId, projectId]);
 
   const fetchDistribution = useCallback(async () => {
     updateLoading('distribution', true);
     updateError('distribution', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/distribution?${params}`);
+      const data = await apiFetch(`/api/dashboard/distribution?year=${yearParam}&${params}`);
       setDistribution(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -126,14 +132,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('distribution', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
   const fetchBudgetComparison = useCallback(async () => {
     updateLoading('budget', true);
     updateError('budget', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/budget-comparison?${params}`);
+      const data = await apiFetch(`/api/dashboard/budget-comparison?year=${yearParam}&${params}`);
       setBudgetComparison(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -142,14 +148,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('budget', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
   const fetchLastReceived = useCallback(async () => {
     updateLoading('lastReceived', true);
     updateError('lastReceived', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/last-received?${params}`);
+      const data = await apiFetch(`/api/dashboard/last-received?year=${yearParam}&${params}`);
       setLastReceived(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -158,14 +164,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('lastReceived', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
   const fetchDeadlines = useCallback(async () => {
     updateLoading('deadlines', true);
     updateError('deadlines', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/deadlines?${params}`);
+      const data = await apiFetch(`/api/dashboard/deadlines?year=${yearParam}&${params}`);
       setDeadlines(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -174,14 +180,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('deadlines', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
   const fetchCalendar = useCallback(async () => {
     updateLoading('calendar', true);
     updateError('calendar', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/calendar?${params}`);
+      const data = await apiFetch(`/api/dashboard/calendar?year=${yearParam}&${params}`);
       setCalendarEvents(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -190,14 +196,14 @@ export default function DashboardPage() {
     } finally {
       updateLoading('calendar', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
   const fetchProjects = useCallback(async () => {
     updateLoading('projects', true);
     updateError('projects', null);
     try {
       const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/projects?${params}`);
+      const data = await apiFetch(`/api/dashboard/projects?year=${yearParam}&${params}`);
       setProjects(data as any);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -206,19 +212,19 @@ export default function DashboardPage() {
     } finally {
       updateLoading('projects', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, projectId, yearParam]);
 
 
   useEffect(() => {
     fetchMetrics();
-    fetchRevenue(selectedYear);
+    fetchRevenue();
     fetchDistribution();
     fetchBudgetComparison();
     fetchLastReceived();
     fetchDeadlines();
     fetchCalendar();
     fetchProjects();
-  }, [selectedYear, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
+  }, [yearParam, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
@@ -337,7 +343,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fetchRevenue(selectedYear)}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fetchRevenue()}><RefreshCw className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('revenue')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
                 <RevenueChart loading={loadingStates.revenue} data={revenue} />

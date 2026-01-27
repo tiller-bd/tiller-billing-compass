@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { handlePrismaError } from '@/lib/api-error';
+import { parseYearValue, getYearDateRange } from '@/lib/date-utils';
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
     const projectId = searchParams.get("projectId");
+    const yearParam = searchParams.get("year");
 
     const projectWhere: any = {};
 
@@ -35,12 +37,26 @@ export async function GET(request: NextRequest) {
       if (!isNaN(parsed)) projectWhere.id = parsed;
     }
 
+    // Build bill where clause
+    const billWhere: any = {
+      status: 'PAID',
+      receivedAmount: { gt: 0 },
+      project: projectWhere,
+    };
+
+    // Year filter on receivedDate (skip if "all")
+    if (yearParam && yearParam !== "all") {
+      const { type: yearType, year } = parseYearValue(yearParam);
+      const isFiscal = yearType === "fiscal";
+      const { start, end } = getYearDateRange(year, isFiscal);
+      billWhere.receivedDate = {
+        gte: start,
+        lte: end,
+      };
+    }
+
     const bills = await prisma.projectBill.findMany({
-      where: {
-        status: 'PAID',
-        receivedAmount: { gt: 0 },
-        project: projectWhere,
-      },
+      where: billWhere,
       orderBy: { receivedDate: 'desc' },
       take: 5,
       include: { project: true }

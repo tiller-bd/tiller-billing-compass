@@ -11,6 +11,7 @@ interface MetricCardProps {
   icon: LucideIcon;
   loading?: boolean;
   variant?: 'default' | 'primary' | 'success' | 'warning';
+  description?: string;
 }
 
 export function MetricCard({
@@ -18,7 +19,8 @@ export function MetricCard({
   value,
   icon: Icon,
   loading = false,
-  variant = 'default'
+  variant = 'default',
+  description
 }: MetricCardProps) {
   if (loading) {
     return (
@@ -60,15 +62,20 @@ export function MetricCard({
           </div>
           <p className="text-[10px] md:text-sm text-muted-foreground font-medium truncate">{title}</p>
         </div>
-        <p className={cn(
-          "text-base md:text-2xl font-bold tracking-tight mt-auto",
-          variant === 'primary' && "stat-value",
-          variant === 'success' && "text-success",
-          variant === 'warning' && "text-warning",
-          variant === 'default' && "text-foreground"
-        )}>
-          {value}
-        </p>
+        <div className="mt-auto">
+          <p className={cn(
+            "text-base md:text-2xl font-bold tracking-tight",
+            variant === 'primary' && "stat-value",
+            variant === 'success' && "text-success",
+            variant === 'warning' && "text-warning",
+            variant === 'default' && "text-foreground"
+          )}>
+            {value}
+          </p>
+          {description && (
+            <p className="text-[9px] md:text-xs text-muted-foreground mt-0.5">{description}</p>
+          )}
+        </div>
       </div>
     </motion.div>
   );

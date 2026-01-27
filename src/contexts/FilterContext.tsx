@@ -1,6 +1,7 @@
 "use client"
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
+import { getCurrentFiscalYear, YearType } from '@/lib/date-utils';
 
 export interface Suggestion {
   id: string;
@@ -18,6 +19,8 @@ interface FilterContextType {
   setClientId: (id: string) => void;
   projectId: string;
   setProjectId: (id: string) => void;
+  yearType: YearType;
+  setYearType: (type: YearType) => void;
   selectedYear: string;
   setSelectedYear: (year: string) => void;
   selectedFilter: Suggestion | null;
@@ -32,7 +35,9 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
   const [departmentId, setDepartmentId] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [projectId, setProjectId] = useState('all');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  // Default to fiscal year (prioritized)
+  const [yearType, setYearType] = useState<YearType>('fiscal');
+  const [selectedYear, setSelectedYear] = useState(getCurrentFiscalYear());
   const [selectedFilter, setSelectedFilter] = useState<Suggestion | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
@@ -42,7 +47,8 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
     setDepartmentId('all');
     setClientId('all');
     setProjectId('all');
-    setSelectedYear(new Date().getFullYear().toString());
+    setYearType('fiscal');
+    setSelectedYear(getCurrentFiscalYear());
     setSelectedFilter(null);
   };
 
@@ -57,6 +63,8 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
       setClientId,
       projectId,
       setProjectId,
+      yearType,
+      setYearType,
       selectedYear,
       setSelectedYear,
       selectedFilter,

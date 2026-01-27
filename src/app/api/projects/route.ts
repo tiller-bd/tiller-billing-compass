@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError, apiError } from "@/lib/api-error";
+import { parseYearValue, getYearDateRange } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -41,11 +42,12 @@ export async function GET(request: NextRequest) {
       if (!isNaN(parsed)) where.id = parsed;
     }
 
+    // Parse year filter if provided (and not "all")
+    let dateRange: { start: Date; end: Date } | null = null;
     if (year && year !== "all") {
-      where.startDate = {
-        gte: new Date(`${year}-01-01`),
-        lte: new Date(`${year}-12-31`),
-      };
+      const { type: yearType, year: yearValue } = parseYearValue(year);
+      const isFiscal = yearType === "fiscal";
+      dateRange = getYearDateRange(yearValue, isFiscal);
     }
 
     const projects = await prisma.project.findMany({
@@ -59,10 +61,28 @@ export async function GET(request: NextRequest) {
       orderBy: { startDate: "desc" },
     });
 
-    // Client-side filtering for complex status logic if needed
-    let filtered = projects;
+    // Helper to check if a bill falls within the date range
+    const isBillInDateRange = (bill: any): boolean => {
+      if (!dateRange) return true; // No year filter, include all
+      const billDate = bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate) : null;
+      if (!billDate) return false;
+      return billDate >= dateRange.start && billDate <= dateRange.end;
+    };
+
+    // Filter projects to only include those with bills in the date range
+    // Also filter the bills themselves to only include those in range
+    let filtered = dateRange
+      ? projects
+          .map((p) => ({
+            ...p,
+            bills: p.bills.filter(isBillInDateRange),
+          }))
+          .filter((p) => p.bills.length > 0)
+      : projects;
+
+    // Additional filtering for complex status logic if needed
     if (status && status !== "all") {
-      filtered = projects.filter((p) => {
+      filtered = filtered.filter((p) => {
         const isPaid =
           p.bills.length > 0 && p.bills.every((b) => b.status === "PAID");
         if (status === "COMPLETED") return isPaid;

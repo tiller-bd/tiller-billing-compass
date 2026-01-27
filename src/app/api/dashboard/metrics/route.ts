@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-error";
+import { parseYearValue, getYearDateRange } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -13,56 +14,94 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
     const projectId = searchParams.get("projectId");
+    const yearParam = searchParams.get("year");
 
-    const where: any = {};
+    const projectWhere: any = {};
 
     if (search) {
-      where.OR = [
+      projectWhere.OR = [
         { projectName: { contains: search, mode: "insensitive" } },
         { client: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
     if (departmentId && departmentId !== "all") {
       const parsed = parseInt(departmentId);
-      if (!isNaN(parsed)) where.departmentId = parsed;
+      if (!isNaN(parsed)) projectWhere.departmentId = parsed;
     }
     if (clientId && clientId !== "all") {
       const parsed = parseInt(clientId);
-      if (!isNaN(parsed)) where.clientId = parsed;
+      if (!isNaN(parsed)) projectWhere.clientId = parsed;
     }
     if (projectId && projectId !== "all") {
       const parsed = parseInt(projectId);
-      if (!isNaN(parsed)) where.id = parsed;
+      if (!isNaN(parsed)) projectWhere.id = parsed;
+    }
+
+    // Parse year filter if provided (and not "all")
+    let dateRange: { start: Date; end: Date } | null = null;
+    if (yearParam && yearParam !== "all") {
+      const { type: yearType, year } = parseYearValue(yearParam);
+      const isFiscal = yearType === "fiscal";
+      dateRange = getYearDateRange(year, isFiscal);
     }
 
     const projects = await prisma.project.findMany({
-      where,
+      where: projectWhere,
       include: { bills: true },
     });
 
-    const totalBudget = projects.reduce(
-      (sum, p) => sum + Number(p.totalProjectValue || 0),
+    // Helper to check if a bill falls within the date range
+    // For year filtering, we use tentativeBillingDate to determine which year a bill belongs to
+    const isBillInDateRange = (bill: any): boolean => {
+      if (!dateRange) return true; // No year filter, include all
+      const billDate = bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate) : null;
+      if (!billDate) return false;
+      return billDate >= dateRange.start && billDate <= dateRange.end;
+    };
+
+    // Filter bills by year if dateRange is set
+    const allBills = projects.flatMap((p) => p.bills);
+    const filteredBills = dateRange
+      ? allBills.filter(isBillInDateRange)
+      : allBills;
+
+    // New calculation logic:
+    // Total Budget = sum of ALL bills' billAmount in that year (regardless of status)
+    const totalBudget = filteredBills.reduce(
+      (sum, b) => sum + Number(b.billAmount || 0),
       0
     );
-    const totalReceived = projects
-      .flatMap((p) => p.bills)
+
+    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
+    const totalReceived = filteredBills
+      .filter((b) => b.status === "PAID" || b.status === "PARTIAL")
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
 
-    // PG (Project Guarantee) Calculations
-    const pgDeposited = projects.reduce(
+    // Total Remaining = sum of PENDING bills' billAmount
+    const totalRemaining = filteredBills
+      .filter((b) => b.status === "PENDING")
+      .reduce((sum, b) => sum + Number(b.billAmount || 0), 0);
+
+    // PG (Project Guarantee) Calculations - based on projects, not bills
+    // Filter projects that have at least one bill in the date range, or all if no year filter
+    const projectsWithBillsInRange = dateRange
+      ? projects.filter((p) => p.bills.some(isBillInDateRange))
+      : projects;
+
+    const pgDeposited = projectsWithBillsInRange.reduce(
       (sum, p) => sum + Number(p.pgUserDeposit || 0),
       0
     );
-    const pgCleared = projects
-      .filter(p => p.pgStatus === 'CLEARED')
+    const pgCleared = projectsWithBillsInRange
+      .filter((p) => p.pgStatus === "CLEARED")
       .reduce((sum, p) => sum + Number(p.pgUserDeposit || 0), 0);
     const pgPending = pgDeposited - pgCleared;
 
     return NextResponse.json({
       totalBudget,
       totalReceived,
-      totalRemaining: totalBudget - totalReceived,
-      activeCount: projects.length,
+      totalRemaining,
+      activeCount: projectsWithBillsInRange.length,
       pgDeposited,
       pgCleared,
       pgPending,

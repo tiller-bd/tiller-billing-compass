@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-error";
+import { parseYearValue, getYearDateRange } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
     const projectId = searchParams.get("projectId");
+    const yearParam = searchParams.get("year");
 
     const where: any = {};
 
@@ -28,6 +30,14 @@ export async function GET(request: NextRequest) {
       if (!isNaN(parsed)) where.id = parsed;
     }
 
+    // Parse year filter for filtering events (skip if "all")
+    let dateRange: { start: Date; end: Date } | null = null;
+    if (yearParam && yearParam !== "all") {
+      const { type: yearType, year } = parseYearValue(yearParam);
+      const isFiscal = yearType === "fiscal";
+      dateRange = getYearDateRange(year, isFiscal);
+    }
+
     const projects = await prisma.project.findMany({
       where,
       include: {
@@ -37,9 +47,17 @@ export async function GET(request: NextRequest) {
 
     const events: any[] = [];
 
+    // Helper function to check if date is within range
+    const isInDateRange = (date: Date | null): boolean => {
+      if (!date) return false;
+      if (!dateRange) return true; // No filter, include all
+      const d = new Date(date);
+      return d >= dateRange.start && d <= dateRange.end;
+    };
+
     projects.forEach((project) => {
       // Add project signed date (start date)
-      if (project.startDate) {
+      if (project.startDate && isInDateRange(project.startDate)) {
         events.push({
           date: project.startDate,
           type: 'project_signed',
@@ -49,7 +67,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Add PG cleared date
-      if (project.pgClearanceDate && project.pgStatus === 'CLEARED') {
+      if (project.pgClearanceDate && project.pgStatus === 'CLEARED' && isInDateRange(project.pgClearanceDate)) {
         events.push({
           date: project.pgClearanceDate,
           type: 'pg_cleared',
@@ -62,7 +80,7 @@ export async function GET(request: NextRequest) {
       // Add bill events
       project.bills.forEach((bill) => {
         // Tentative payment dates
-        if (bill.tentativeBillingDate && bill.status !== 'PAID') {
+        if (bill.tentativeBillingDate && bill.status !== 'PAID' && isInDateRange(bill.tentativeBillingDate)) {
           events.push({
             date: bill.tentativeBillingDate,
             type: 'tentative_payment',
@@ -73,7 +91,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Received payment dates
-        if (bill.receivedDate && bill.receivedAmount && Number(bill.receivedAmount) > 0) {
+        if (bill.receivedDate && bill.receivedAmount && Number(bill.receivedAmount) > 0 && isInDateRange(bill.receivedDate)) {
           events.push({
             date: bill.receivedDate,
             type: 'received_payment',

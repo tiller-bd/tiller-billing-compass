@@ -14,6 +14,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { ErrorDisplay } from '@/components/error/ErrorDisplay';
 import { ApiClientError, apiFetch } from '@/lib/api-client';
 import { useSharedFilters } from '@/contexts/FilterContext';
+import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -33,7 +34,35 @@ export default function ProjectsPage() {
   const [deptFilter, setDeptFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  // Default to 'all' years
+  const [yearType, setYearType] = useState<YearType | 'all'>('all');
   const [yearFilter, setYearFilter] = useState('all');
+
+  // Generate year options
+  const calendarYearOptions = useMemo(() => getCalendarYearOptions(), []);
+  const fiscalYearOptions = useMemo(() => getFiscalYearOptions(), []);
+
+  // Get current year options based on selected type
+  const yearOptions = yearType === 'fiscal' ? fiscalYearOptions :
+                       yearType === 'calendar' ? calendarYearOptions : [];
+
+  // Handle year type change
+  const handleYearTypeChange = (newType: YearType | 'all') => {
+    setYearType(newType);
+    if (newType === 'all') {
+      setYearFilter('all');
+    } else if (newType === 'fiscal') {
+      setYearFilter(getCurrentFiscalYear());
+    } else {
+      setYearFilter(new Date().getFullYear().toString());
+    }
+  };
+
+  // Construct year parameter for API
+  const getYearParam = (): string => {
+    if (yearType === 'all' || yearFilter === 'all') return 'all';
+    return yearType === 'fiscal' ? `fy-${yearFilter}` : `cal-${yearFilter}`;
+  };
 
   // Trigger dialog if URL contains ?new=true
   useEffect(() => {
@@ -51,7 +80,8 @@ export default function ProjectsPage() {
       if (deptFilter !== 'all') params.append('departmentId', deptFilter);
       if (catFilter !== 'all') params.append('categoryId', catFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (yearFilter !== 'all') params.append('year', yearFilter);
+      const yearParam = getYearParam();
+      if (yearParam !== 'all') params.append('year', yearParam);
 
       const data = await apiFetch(`/api/projects?${params.toString()}`);
       setProjects(data as any[]);
@@ -63,33 +93,65 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, deptFilter, catFilter, statusFilter, yearFilter]);
+  }, [debouncedSearch, deptFilter, catFilter, statusFilter, yearType, yearFilter]);
 
+  // Fetch filter options when year changes
   useEffect(() => {
-    Promise.all([
-      apiFetch('/api/departments'),
-      apiFetch('/api/categories')
-    ]).then(([depts, cats]) => {
-      setDepartments(depts as any);
-      setCategories(cats as any);
-    }).catch(err => console.error("Failed to fetch filters:", err));
-  }, []);
+    async function fetchFilterOptions() {
+      try {
+        const yearParam = getYearParam();
+        const yearQuery = yearParam !== 'all' ? `?year=${yearParam}` : '';
+
+        const [depts, cats] = await Promise.all([
+          apiFetch(`/api/departments${yearQuery}`),
+          apiFetch('/api/categories') // Categories don't need year filter
+        ]);
+
+        const newDepartments = depts as any[];
+        const newCategories = cats as any[];
+
+        setDepartments(newDepartments);
+        setCategories(newCategories);
+
+        // Reset department selection if current value is no longer available
+        if (deptFilter !== 'all' && !newDepartments.some((d: any) => d.id.toString() === deptFilter)) {
+          setDeptFilter('all');
+        }
+      } catch (err) {
+        console.error("Failed to fetch filters:", err);
+      }
+    }
+    fetchFilterOptions();
+  }, [yearType, yearFilter]);
 
   useEffect(() => {
     const timer = setTimeout(fetchProjects, 400);
     return () => clearTimeout(timer);
   }, [fetchProjects]);
 
-  // Calculate metrics from filtered projects
+  // Calculate metrics from filtered projects using bill-based logic
   const metrics = useMemo(() => {
-    const totalBudget = projects.reduce((sum, p) => sum + Number(p.totalProjectValue || 0), 0);
-    const totalReceived = projects.reduce((sum, p) => {
-      const received = p.bills?.filter((b: any) => b.status === 'PAID')
-        .reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0) || 0;
-      return sum + received;
-    }, 0);
-    const totalRemaining = totalBudget - totalReceived;
-    const activeCount = projects.filter(p => {
+    // Get all bills from all projects
+    const allBills = projects.flatMap((p) => p.bills || []);
+
+    // Total Budget = sum of ALL bills' billAmount (regardless of status)
+    const totalBudget = allBills.reduce(
+      (sum, b: any) => sum + Number(b.billAmount || 0),
+      0
+    );
+
+    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
+    const totalReceived = allBills
+      .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
+      .reduce((sum, b: any) => sum + Number(b.receivedAmount || 0), 0);
+
+    // Total Remaining = sum of PENDING bills' billAmount
+    const totalRemaining = allBills
+      .filter((b: any) => b.status === 'PENDING')
+      .reduce((sum, b: any) => sum + Number(b.billAmount || 0), 0);
+
+    // Active projects = projects with at least one unpaid bill
+    const activeCount = projects.filter((p) => {
       const hasUnpaidBills = p.bills?.some((b: any) => b.status !== 'PAID');
       return hasUnpaidBills;
     }).length;
@@ -116,11 +178,17 @@ export default function ProjectsPage() {
       return sum;
     }, 0);
 
+    // Collection percentage
+    const collectionPercent = totalBudget > 0
+      ? Math.round((totalReceived / totalBudget) * 100)
+      : 0;
+
     return {
       totalBudget,
       totalReceived,
       totalRemaining,
       activeCount,
+      collectionPercent,
       pgDeposited,
       pgCleared,
       pgPending,
@@ -184,19 +252,19 @@ export default function ProjectsPage() {
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Total Received" value={formatCurrency(metrics.totalReceived)} icon={TrendingUp} variant="success" />
+            <MetricCard loading={loading} title="Total Received" value={formatCurrency(metrics.totalReceived)} description={`${metrics.collectionPercent}% collected`} icon={TrendingUp} variant="success" />
           </div>
           <div className="relative group">
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Total Remaining" value={formatCurrency(metrics.totalRemaining)} icon={TrendingDown} variant="warning" />
+            <MetricCard loading={loading} title="Total Pending" value={formatCurrency(metrics.totalRemaining)} description={`${100 - metrics.collectionPercent}% remaining`} icon={TrendingDown} variant="warning" />
           </div>
           <div className="relative group">
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Active Projects" value={metrics.activeCount.toString()} icon={FolderKanban} />
+            <MetricCard loading={loading} title="Active Projects" value={metrics.activeCount.toString()} description={`${projects.length} total`} icon={FolderKanban} />
           </div>
         </div>
 
@@ -252,7 +320,7 @@ export default function ProjectsPage() {
 
         {/* Filter Bar - Scrollable on mobile */}
         <div className="glass-card rounded-xl border border-border/50 p-3 md:p-4 overflow-x-auto">
-          <div className="flex md:grid md:grid-cols-4 gap-2 md:gap-3 min-w-max md:min-w-0">
+          <div className="flex md:grid md:grid-cols-5 gap-2 md:gap-3 min-w-max md:min-w-0">
             <Select value={deptFilter} onValueChange={setDeptFilter}>
               <SelectTrigger className="bg-secondary/30 w-32 md:w-full text-xs md:text-sm"><SelectValue placeholder="Department" /></SelectTrigger>
               <SelectContent>
@@ -275,13 +343,32 @@ export default function ProjectsPage() {
                 <SelectItem value="COMPLETED">Completed</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="bg-secondary/30 w-24 md:w-full text-xs md:text-sm"><SelectValue placeholder="Year" /></SelectTrigger>
+            {/* Year Type Selector - Fiscal prioritized */}
+            <Select value={yearType} onValueChange={(v) => handleYearTypeChange(v as YearType | 'all')}>
+              <SelectTrigger className="bg-secondary/30 w-24 md:w-full text-xs md:text-sm">
+                <SelectValue placeholder="Year Type" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Years</SelectItem>
-                {[2024, 2025, 2026].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                <SelectItem value="fiscal">Fiscal</SelectItem>
+                <SelectItem value="calendar">Calendar</SelectItem>
               </SelectContent>
             </Select>
+            {/* Year Value Selector - Only shown when year type is selected */}
+            {yearType !== 'all' && (
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="bg-secondary/30 w-24 md:w-full text-xs md:text-sm">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {yearType === 'fiscal' ? `FY ${y}` : y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 

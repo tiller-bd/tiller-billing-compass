@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useSharedFilters, Suggestion } from '@/contexts/FilterContext';
 import { Label } from '@/components/ui/label';
 import { RefreshCw } from 'lucide-react';
+import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
 
 interface Option {
   id: string;
@@ -17,6 +18,7 @@ export function DashboardFilter() {
     departmentId, setDepartmentId,
     clientId, setClientId,
     projectId, setProjectId,
+    yearType, setYearType,
     selectedYear, setSelectedYear,
     resetFilters,
     selectedFilter,
@@ -30,28 +32,43 @@ export function DashboardFilter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Generate year options from 2024 to current year
-  const generateYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2024;
-    const years = [];
-    for (let year = currentYear; year >= startYear; year--) {
-      years.push(year.toString());
-    }
-    return years;
+  // Generate year options
+  const calendarYearOptions = useMemo(() => getCalendarYearOptions(), []);
+  const fiscalYearOptions = useMemo(() => getFiscalYearOptions(), []);
+
+  // Get current year options based on selected type
+  const yearOptions = yearType === 'fiscal' ? fiscalYearOptions : calendarYearOptions;
+
+  // Construct year parameter for API calls
+  const getYearParam = (): string => {
+    if (selectedYear === 'all') return 'all';
+    return yearType === 'fiscal' ? `fy-${selectedYear}` : `cal-${selectedYear}`;
   };
 
-  const yearOptions = generateYearOptions();
+  // Handle year type change - also update selected year to a valid value for the new type
+  const handleYearTypeChange = (newType: YearType) => {
+    setYearType(newType);
+    // Set default year for the new type
+    if (newType === 'fiscal') {
+      setSelectedYear(getCurrentFiscalYear());
+    } else {
+      setSelectedYear(new Date().getFullYear().toString());
+    }
+  };
 
+  // Fetch filter options when year changes
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setError(null);
       try {
+        const yearParam = getYearParam();
+        const yearQuery = yearParam !== 'all' ? `?year=${yearParam}` : '';
+
         const [departmentsRes, clientsRes, projectsRes] = await Promise.all([
-          fetch('/api/departments'),
-          fetch('/api/clients'),
-          fetch('/api/projects')
+          fetch(`/api/departments${yearQuery}`),
+          fetch(`/api/clients${yearQuery}`),
+          fetch(`/api/projects${yearQuery}`)
         ]);
 
         if (!departmentsRes.ok) throw new Error('Failed to fetch departments');
@@ -61,10 +78,25 @@ export function DashboardFilter() {
         const departmentsData = await departmentsRes.json();
         const clientsData = await clientsRes.json();
         const projectsData = await projectsRes.json();
-        
-        setDepartments(departmentsData.map((d: any) => ({ id: d.id.toString(), name: d.name })));
-        setClients(clientsData.map((c: any) => ({ id: c.id.toString(), name: c.name })));
-        setProjects(projectsData.map((p: any) => ({ id: p.id.toString(), name: p.projectName })));
+
+        const newDepartments = departmentsData.map((d: any) => ({ id: d.id.toString(), name: d.name }));
+        const newClients = clientsData.map((c: any) => ({ id: c.id.toString(), name: c.name }));
+        const newProjects = projectsData.map((p: any) => ({ id: p.id.toString(), name: p.projectName }));
+
+        setDepartments(newDepartments);
+        setClients(newClients);
+        setProjects(newProjects);
+
+        // Reset selections if current value is no longer available
+        if (departmentId !== 'all' && !newDepartments.some((d: Option) => d.id === departmentId)) {
+          setDepartmentId('all');
+        }
+        if (clientId !== 'all' && !newClients.some((c: Option) => c.id === clientId)) {
+          setClientId('all');
+        }
+        if (projectId !== 'all' && !newProjects.some((p: Option) => p.id === projectId)) {
+          setProjectId('all');
+        }
 
       } catch (err: any) {
         setError(err.message);
@@ -74,7 +106,7 @@ export function DashboardFilter() {
       }
     }
     fetchData();
-  }, []);
+  }, [yearType, selectedYear]);
 
   const handleDepartmentChange = (value: string) => {
     setDepartmentId(value);
@@ -177,6 +209,24 @@ export function DashboardFilter() {
           </Select>
         </div>
 
+        {/* Year Type Selector - Fiscal prioritized (first) */}
+        <div>
+          <Label htmlFor="year-type-filter" className="sr-only">Year Type</Label>
+          <Select
+            value={yearType}
+            onValueChange={(value) => handleYearTypeChange(value as YearType)}
+          >
+            <SelectTrigger className="w-[90px] md:w-[110px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="Year Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fiscal">Fiscal</SelectItem>
+              <SelectItem value="calendar">Calendar</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Year Value Selector */}
         <div>
           <Label htmlFor="year-filter" className="sr-only">Filter by Year</Label>
           <Select
@@ -187,8 +237,11 @@ export function DashboardFilter() {
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
               {yearOptions.map((year) => (
-                <SelectItem key={year} value={year}>{year}</SelectItem>
+                <SelectItem key={year} value={year}>
+                  {yearType === 'fiscal' ? `FY ${year}` : year}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

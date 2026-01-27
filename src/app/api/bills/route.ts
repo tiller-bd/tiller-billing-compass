@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError, apiError } from "@/lib/api-error";
+import { parseYearValue, getYearDateRange } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -60,9 +61,13 @@ export async function GET(request: NextRequest) {
       };
     }
     if (year && year !== "all") {
+      // Parse the year value to support both calendar and fiscal year formats
+      const { type: yearType, year: yearValue } = parseYearValue(year);
+      const isFiscal = yearType === "fiscal";
+      const { start, end } = getYearDateRange(yearValue, isFiscal);
       where.tentativeBillingDate = {
-        gte: new Date(`${year}-01-01`),
-        lte: new Date(`${year}-12-31`),
+        gte: start,
+        lte: end,
       };
     }
 
