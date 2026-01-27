@@ -1,5 +1,5 @@
 // src/app/login/page.tsx
-"use client"; 
+"use client";
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Building2, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -20,8 +20,6 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      console.log("use effect theke nicche");
-      
       router.push('/');
     }
   }, [isAuthenticated, router]);
@@ -33,8 +31,6 @@ export default function Login() {
 
     const result = await login(email, password);
     if (result.success) {
-      console.log("login done");
-      
       router.push('/');
     } else {
       setError(result.error || 'Login failed');

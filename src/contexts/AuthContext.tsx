@@ -72,8 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Clear cookie on server via a simple utility route or just client-side expiration
-    document.cookie = "auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    try {
+      // Clear httpOnly cookie via server API
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch {
+      // Continue with logout even if API fails
+    }
     setUser(null);
     localStorage.removeItem('auth_user');
     router.push('/login');

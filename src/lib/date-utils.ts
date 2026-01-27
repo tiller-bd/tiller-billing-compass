@@ -6,7 +6,7 @@
  * - FY 2025-26: July 1, 2025 → June 30, 2026
  */
 
-export type YearType = 'calendar' | 'fiscal';
+export type YearType = 'all' | 'calendar' | 'fiscal';
 
 export interface ParsedYearValue {
   type: YearType;

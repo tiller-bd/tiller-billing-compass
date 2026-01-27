@@ -13,8 +13,8 @@ export async function POST() {
     // Clear the auth session cookie
     cookieStore.set("auth_session", "", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: false, // Set to true when using HTTPS in production
+      sameSite: "lax",
       maxAge: 0, // Expire immediately
       path: "/",
     });

@@ -49,7 +49,9 @@ export function DashboardFilter() {
   const handleYearTypeChange = (newType: YearType) => {
     setYearType(newType);
     // Set default year for the new type
-    if (newType === 'fiscal') {
+    if (newType === 'all') {
+      setSelectedYear('all');
+    } else if (newType === 'fiscal') {
       setSelectedYear(getCurrentFiscalYear());
     } else {
       setSelectedYear(new Date().getFullYear().toString());
@@ -209,43 +211,45 @@ export function DashboardFilter() {
           </Select>
         </div>
 
-        {/* Year Type Selector - Fiscal prioritized (first) */}
+        {/* Year Type Selector - All Years is default */}
         <div>
           <Label htmlFor="year-type-filter" className="sr-only">Year Type</Label>
           <Select
             value={yearType}
             onValueChange={(value) => handleYearTypeChange(value as YearType)}
           >
-            <SelectTrigger className="w-[90px] md:w-[110px] h-9 md:h-10 text-xs md:text-sm">
+            <SelectTrigger className="w-[100px] md:w-[120px] h-9 md:h-10 text-xs md:text-sm">
               <SelectValue placeholder="Year Type" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
               <SelectItem value="fiscal">Fiscal</SelectItem>
               <SelectItem value="calendar">Calendar</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Year Value Selector */}
-        <div>
-          <Label htmlFor="year-filter" className="sr-only">Filter by Year</Label>
-          <Select
-            value={selectedYear}
-            onValueChange={setSelectedYear}
-          >
-            <SelectTrigger className="w-[100px] md:w-[120px] h-9 md:h-10 text-xs md:text-sm">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              {yearOptions.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {yearType === 'fiscal' ? `FY ${year}` : year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Year Value Selector - Only show when fiscal or calendar is selected */}
+        {yearType !== 'all' && (
+          <div>
+            <Label htmlFor="year-filter" className="sr-only">Filter by Year</Label>
+            <Select
+              value={selectedYear}
+              onValueChange={setSelectedYear}
+            >
+              <SelectTrigger className="w-[100px] md:w-[120px] h-9 md:h-10 text-xs md:text-sm">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {yearType === 'fiscal' ? `FY ${year}` : year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <Button variant="outline" onClick={resetFilters} className="h-9 md:h-10 text-xs md:text-sm px-3 md:px-4 shrink-0">
           Reset
