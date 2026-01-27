@@ -74,10 +74,17 @@ export async function GET(request: NextRequest) {
       const received = p.bills
         .filter((b) => b.status === "PAID" || b.status === "PARTIAL")
         .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
-      // Remaining = sum of PENDING bills' billAmount
-      const remaining = p.bills
-        .filter((b) => b.status === "PENDING")
-        .reduce((sum, b) => sum + Number(b.billAmount || 0), 0);
+      // Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
+      const remaining = p.bills.reduce((sum, b) => {
+        if (b.status === "PENDING") {
+          return sum + Number(b.billAmount || 0);
+        } else if (b.status === "PARTIAL") {
+          const billAmount = Number(b.billAmount || 0);
+          const receivedAmount = Number(b.receivedAmount || 0);
+          return sum + (billAmount - receivedAmount);
+        }
+        return sum;
+      }, 0);
 
       return {
         // Shorten long names for chart readability

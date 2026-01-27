@@ -145,10 +145,17 @@ export default function ProjectsPage() {
       .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
       .reduce((sum, b: any) => sum + Number(b.receivedAmount || 0), 0);
 
-    // Total Remaining = sum of PENDING bills' billAmount
-    const totalRemaining = allBills
-      .filter((b: any) => b.status === 'PENDING')
-      .reduce((sum, b: any) => sum + Number(b.billAmount || 0), 0);
+    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
+    const totalRemaining = allBills.reduce((sum, b: any) => {
+      if (b.status === 'PENDING') {
+        return sum + Number(b.billAmount || 0);
+      } else if (b.status === 'PARTIAL') {
+        const billAmount = Number(b.billAmount || 0);
+        const receivedAmount = Number(b.receivedAmount || 0);
+        return sum + (billAmount - receivedAmount);
+      }
+      return sum;
+    }, 0);
 
     // Active projects = projects with at least one unpaid bill
     const activeCount = projects.filter((p) => {

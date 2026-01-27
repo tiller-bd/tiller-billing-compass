@@ -77,10 +77,17 @@ export async function GET(request: NextRequest) {
       .filter((b) => b.status === "PAID" || b.status === "PARTIAL")
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
 
-    // Total Remaining = sum of PENDING bills' billAmount
-    const totalRemaining = filteredBills
-      .filter((b) => b.status === "PENDING")
-      .reduce((sum, b) => sum + Number(b.billAmount || 0), 0);
+    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
+    const totalRemaining = filteredBills.reduce((sum, b) => {
+      if (b.status === "PENDING") {
+        return sum + Number(b.billAmount || 0);
+      } else if (b.status === "PARTIAL") {
+        const billAmount = Number(b.billAmount || 0);
+        const receivedAmount = Number(b.receivedAmount || 0);
+        return sum + (billAmount - receivedAmount);
+      }
+      return sum;
+    }, 0);
 
     // PG (Project Guarantee) Calculations - based on projects, not bills
     // Filter projects that have at least one bill in the date range, or all if no year filter

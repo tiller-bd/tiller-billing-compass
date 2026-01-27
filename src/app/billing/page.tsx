@@ -145,10 +145,17 @@ export default function BillingMasterPage() {
       .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
       .reduce((sum: number, b: any) => sum + Number(b.receivedAmount || 0), 0);
 
-    // Total Remaining = sum of PENDING bills' billAmount
-    const totalRemaining = bills
-      .filter((b: any) => b.status === 'PENDING')
-      .reduce((sum: number, b: any) => sum + Number(b.billAmount || 0), 0);
+    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
+    const totalRemaining = bills.reduce((sum: number, b: any) => {
+      if (b.status === 'PENDING') {
+        return sum + Number(b.billAmount || 0);
+      } else if (b.status === 'PARTIAL') {
+        const billAmount = Number(b.billAmount || 0);
+        const receivedAmount = Number(b.receivedAmount || 0);
+        return sum + (billAmount - receivedAmount);
+      }
+      return sum;
+    }, 0);
 
     // Collection percentage
     const collectionPercent = totalBudget > 0

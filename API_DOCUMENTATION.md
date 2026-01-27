@@ -144,6 +144,11 @@ Returns key financial metrics.
 }
 ```
 
+**Calculation Logic:**
+- **Total Budget** = Sum of ALL bills' `billAmount` (regardless of status)
+- **Total Received** = Sum of PAID + PARTIAL bills' `receivedAmount`
+- **Total Remaining** = PENDING bills' `billAmount` + PARTIAL bills' (`billAmount` - `receivedAmount`)
+
 **SQL Equivalent:**
 ```sql
 -- Total Budget (sum of all bills)
@@ -154,18 +159,23 @@ WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30'
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
   AND (p.client_id = :clientId OR :clientId IS NULL);
 
--- Total Received (PAID + PARTIAL bills)
+-- Total Received (PAID + PARTIAL bills' received amount)
 SELECT SUM(pb.received_amount) as total_received
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 WHERE pb.status IN ('PAID', 'PARTIAL')
   AND pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30';
 
--- Total Remaining (PENDING bills)
-SELECT SUM(pb.bill_amount) as total_remaining
+-- Total Remaining (PENDING bills + PARTIAL bills' remaining)
+SELECT SUM(
+  CASE
+    WHEN pb.status = 'PENDING' THEN pb.bill_amount
+    WHEN pb.status = 'PARTIAL' THEN pb.bill_amount - COALESCE(pb.received_amount, 0)
+    ELSE 0
+  END
+) as total_remaining
 FROM project_bills pb
-WHERE pb.status = 'PENDING'
-  AND pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30';
+WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30';
 
 -- PG Metrics
 SELECT
@@ -292,13 +302,24 @@ Returns budget vs received comparison per project.
 ]
 ```
 
+**Calculation Logic:**
+- **Budget** = Sum of ALL bills' `billAmount`
+- **Received** = Sum of PAID + PARTIAL bills' `receivedAmount`
+- **Remaining** = PENDING bills' `billAmount` + PARTIAL bills' (`billAmount` - `receivedAmount`)
+
 **SQL Equivalent:**
 ```sql
 SELECT
   p.project_name as name,
   SUM(pb.bill_amount) as budget,
   SUM(CASE WHEN pb.status IN ('PAID', 'PARTIAL') THEN pb.received_amount ELSE 0 END) as received,
-  SUM(CASE WHEN pb.status = 'PENDING' THEN pb.bill_amount ELSE 0 END) as remaining
+  SUM(
+    CASE
+      WHEN pb.status = 'PENDING' THEN pb.bill_amount
+      WHEN pb.status = 'PARTIAL' THEN pb.bill_amount - COALESCE(pb.received_amount, 0)
+      ELSE 0
+    END
+  ) as remaining
 FROM projects p
 JOIN project_bills pb ON pb.project_id = p.id
 WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30'
