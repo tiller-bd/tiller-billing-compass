@@ -229,6 +229,43 @@ ORDER BY
 
 ---
 
+### GET `/api/dashboard/revenue-yearly`
+
+Returns yearly revenue data aggregated across all years (used when "All Years" is selected).
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `projectId` | string | Project ID or `all` |
+
+**Response:**
+```json
+[
+  { "year": "2020", "received": 500000 },
+  { "year": "2021", "received": 750000 },
+  { "year": "2022", "received": 1200000 },
+  ...
+]
+```
+
+**SQL Equivalent:**
+```sql
+SELECT
+  EXTRACT(YEAR FROM pb.received_date) as year,
+  SUM(pb.received_amount) as received
+FROM project_bills pb
+JOIN projects p ON pb.project_id = p.id
+WHERE pb.status IN ('PAID', 'PARTIAL')
+  AND pb.received_date IS NOT NULL
+  AND (p.department_id = :departmentId OR :departmentId IS NULL)
+GROUP BY EXTRACT(YEAR FROM pb.received_date)
+ORDER BY year;
+```
+
+---
+
 ### GET `/api/dashboard/distribution`
 
 Returns project distribution data for sunburst chart (Department -> Project -> Bill hierarchy).

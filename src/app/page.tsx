@@ -20,6 +20,7 @@ import { ApiClientError, apiFetch } from '@/lib/api-client';
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<any>(null);
   const [revenue, setRevenue] = useState([]);
+  const [revenueYearly, setRevenueYearly] = useState([]);
   const [distribution, setDistribution] = useState([]);
   const [budgetComparison, setBudgetComparison] = useState([]);
   const [lastReceived, setLastReceived] = useState([]);
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const [loadingStates, setLoadingStates] = useState({
     metrics: true,
     revenue: true,
+    revenueYearly: true,
     distribution: true,
     budget: true,
     lastReceived: true,
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   const [errors, setErrors] = useState<{
     metrics: ApiClientError | null;
     revenue: ApiClientError | null;
+    revenueYearly: ApiClientError | null;
     distribution: ApiClientError | null;
     budget: ApiClientError | null;
     lastReceived: ApiClientError | null;
@@ -61,6 +64,7 @@ export default function DashboardPage() {
   }>({
     metrics: null,
     revenue: null,
+    revenueYearly: null,
     distribution: null,
     budget: null,
     lastReceived: null,
@@ -117,6 +121,22 @@ export default function DashboardPage() {
       updateLoading('revenue', false);
     }
   }, [yearParam, departmentId, clientId, projectId]);
+
+  const fetchRevenueYearly = useCallback(async () => {
+    updateLoading('revenueYearly', true);
+    updateError('revenueYearly', null);
+    try {
+      const params = getFilterQueryParams();
+      const data = await apiFetch(`/api/dashboard/revenue-yearly?${params}`);
+      setRevenueYearly(data as any);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        updateError('revenueYearly', err);
+      }
+    } finally {
+      updateLoading('revenueYearly', false);
+    }
+  }, [departmentId, clientId, projectId]);
 
   const fetchDistribution = useCallback(async () => {
     updateLoading('distribution', true);
@@ -218,13 +238,14 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchMetrics();
     fetchRevenue();
+    fetchRevenueYearly();
     fetchDistribution();
     fetchBudgetComparison();
     fetchLastReceived();
     fetchDeadlines();
     fetchCalendar();
     fetchProjects();
-  }, [yearParam, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
+  }, [yearParam, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchRevenueYearly, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
@@ -242,7 +263,7 @@ export default function DashboardPage() {
             <Button variant="ghost" size="icon" className="absolute top-2 right-2 md:top-4 md:right-4" onClick={() => setExpandedCard(null)}>
               <X className="h-5 w-5" />
             </Button>
-            {expandedCard === 'revenue' && <RevenueChart data={revenue} isExpanded />}
+            {expandedCard === 'revenue' && <RevenueChart data={revenue} yearlyData={revenueYearly} isExpanded isAllYears={selectedYear === 'all'} />}
             {expandedCard === 'budget' && <BudgetComparisonChart data={budgetComparison} isExpanded />}
             {expandedCard === 'distribution' && <ProjectDistributionChart data={distribution} isExpanded />}
             {expandedCard === 'lastReceived' && <LastReceived data={lastReceived} isExpanded />}
@@ -343,10 +364,16 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fetchRevenue()}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { fetchRevenue(); fetchRevenueYearly(); }}><RefreshCw className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('revenue')}><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
-                <RevenueChart loading={loadingStates.revenue} data={revenue} />
+                <RevenueChart
+                  loading={loadingStates.revenue}
+                  loadingYearly={loadingStates.revenueYearly}
+                  data={revenue}
+                  yearlyData={revenueYearly}
+                  isAllYears={selectedYear === 'all'}
+                />
               </div>
 
               <div className="relative group">

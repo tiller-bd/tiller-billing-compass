@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
 
-const IDLE_TIMEOUT = 2 * 60 * 1000;
+const IDLE_TIMEOUT = 2 * 60 * 2000;
 
 interface AuthContextType {
   user: User | null;
