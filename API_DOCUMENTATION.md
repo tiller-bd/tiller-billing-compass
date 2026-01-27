@@ -268,7 +268,7 @@ ORDER BY year;
 
 ### GET `/api/dashboard/distribution`
 
-Returns project distribution data for sunburst chart (Department -> Project -> Bill hierarchy).
+Returns project distribution data for sunburst chart (Client -> Project hierarchy).
 
 **Query Parameters:** Same as `/api/dashboard/metrics`
 
@@ -276,47 +276,55 @@ Returns project distribution data for sunburst chart (Department -> Project -> B
 ```json
 [
   {
-    "name": "Engineering",
+    "name": "Client ABC",
     "value": 1000000,
-    "fill": "hsl(137, 70%, 45%)",
+    "fill": "hsl(210, 70%, 45%)",
+    "received": 600000,
+    "remaining": 400000,
+    "projectCount": 3,
     "children": [
       {
         "name": "Project Alpha",
         "value": 500000,
-        "fill": "hsl(137, 70%, 55%)",
-        "children": [
-          {
-            "name": "Bill 1",
-            "value": 250000,
-            "fill": "hsl(137, 75%, 75%)",
-            "received": 200000,
-            "remaining": 50000,
-            "percentReceived": 80
-          }
-        ]
+        "fill": "hsl(210, 60%, 55%)",
+        "received": 300000,
+        "remaining": 200000,
+        "percentReceived": 60,
+        "billCount": 5,
+        "clientName": "Client ABC"
       }
     ]
   }
 ]
 ```
 
+**Structure:**
+- **Inner Ring:** Clients (darker colors)
+- **Outer Ring:** Projects (lighter shades of parent client color)
+
 **SQL Equivalent:**
 ```sql
 SELECT
-  d.id as dept_id,
-  d.name as dept_name,
+  c.id as client_id,
+  c.name as client_name,
   p.id as project_id,
   p.project_name,
-  pb.id as bill_id,
-  pb.bill_name,
-  pb.bill_amount,
-  pb.received_amount,
-  pb.remaining_amount
-FROM departments d
-JOIN projects p ON p.department_id = d.id
+  SUM(pb.bill_amount) as budget,
+  SUM(CASE WHEN pb.status IN ('PAID', 'PARTIAL') THEN pb.received_amount ELSE 0 END) as received,
+  SUM(
+    CASE
+      WHEN pb.status = 'PENDING' THEN pb.bill_amount
+      WHEN pb.status = 'PARTIAL' THEN pb.bill_amount - COALESCE(pb.received_amount, 0)
+      ELSE 0
+    END
+  ) as remaining,
+  COUNT(pb.id) as bill_count
+FROM clients c
+JOIN projects p ON p.client_id = c.id
 JOIN project_bills pb ON pb.project_id = p.id
 WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30'
-ORDER BY d.name, p.project_name, pb.tentative_billing_date;
+GROUP BY c.id, c.name, p.id, p.project_name
+ORDER BY c.name, p.project_name;
 ```
 
 ---

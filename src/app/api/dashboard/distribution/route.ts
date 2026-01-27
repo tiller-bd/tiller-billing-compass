@@ -44,11 +44,11 @@ export async function GET(request: NextRequest) {
       dateRange = getYearDateRange(year, isFiscal);
     }
 
-    // Fetch projects with their department and bills
+    // Fetch projects with their client and bills
     const projects = await prisma.project.findMany({
       where: projectWhere,
       include: {
-        department: {
+        client: {
           select: {
             id: true,
             name: true
@@ -85,63 +85,89 @@ export async function GET(request: NextRequest) {
       }))
       .filter((p) => p.bills.length > 0);
 
-    // Group by Department
-    const departmentMap = new Map();
+    // Group by Client
+    const clientMap = new Map();
 
     projectsWithFilteredBills.forEach((project) => {
-      // Handle projects with no department
-      const deptId = project.department?.id || 'unassigned';
-      const deptName = project.department?.name || 'Unassigned';
+      // Handle projects with no client
+      const clientIdVal = project.client?.id || 'unassigned';
+      const clientName = project.client?.name || 'Unassigned';
 
-      if (!departmentMap.has(deptId)) {
-        departmentMap.set(deptId, {
-          id: deptId,
-          name: deptName,
+      if (!clientMap.has(clientIdVal)) {
+        clientMap.set(clientIdVal, {
+          id: clientIdVal,
+          name: clientName,
           projects: []
         });
       }
-      departmentMap.get(deptId).projects.push(project);
+      clientMap.get(clientIdVal).projects.push(project);
     });
 
-    // Create 3-level Sunburst structure: Department -> Project -> Bill
-    const sunburstData = Array.from(departmentMap.values()).map((dept, idx) => {
-      // Department total = sum of all filtered bills' billAmount
-      const deptTotal = dept.projects.reduce((sum: number, p: any) =>
+    // Create 2-level Sunburst structure: Client -> Project
+    const sunburstData = Array.from(clientMap.values()).map((client, idx) => {
+      // Calculate totals from bills
+      const clientTotalBudget = client.projects.reduce((sum: number, p: any) =>
         sum + p.bills.reduce((billSum: number, b: any) => billSum + (Number(b.billAmount) || 0), 0), 0);
 
-      // Generate base hue for Department using golden angle
+      const clientTotalReceived = client.projects.reduce((sum: number, p: any) =>
+        sum + p.bills
+          .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
+          .reduce((billSum: number, b: any) => billSum + (Number(b.receivedAmount) || 0), 0), 0);
+
+      const clientTotalRemaining = client.projects.reduce((sum: number, p: any) =>
+        sum + p.bills.reduce((billSum: number, b: any) => {
+          if (b.status === 'PENDING') {
+            return billSum + (Number(b.billAmount) || 0);
+          } else if (b.status === 'PARTIAL') {
+            return billSum + ((Number(b.billAmount) || 0) - (Number(b.receivedAmount) || 0));
+          }
+          return billSum;
+        }, 0), 0);
+
+      // Generate base hue for Client using golden angle for better distribution
       const hue = (idx * 137.5) % 360;
 
       return {
-        name: dept.name,
-        value: deptTotal || 1, // Minimum 1 for visibility
-        fill: `hsl(${hue}, 70%, 45%)`, // Darker base for center
-        children: dept.projects.map((project: any) => {
-          // Project total = sum of filtered bills' billAmount
-          const projectTotal = project.bills.reduce((sum: number, b: any) => sum + (Number(b.billAmount) || 0), 0);
+        name: client.name,
+        value: clientTotalBudget || 1, // Minimum 1 for visibility
+        fill: `hsl(${hue}, 70%, 45%)`, // Darker base for inner ring
+        received: clientTotalReceived,
+        remaining: clientTotalRemaining,
+        projectCount: client.projects.length,
+        children: client.projects.map((project: any, projIdx: number) => {
+          // Project totals from bills
+          const projectBudget = project.bills.reduce((sum: number, b: any) => sum + (Number(b.billAmount) || 0), 0);
+
+          const projectReceived = project.bills
+            .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
+            .reduce((sum: number, b: any) => sum + (Number(b.receivedAmount) || 0), 0);
+
+          const projectRemaining = project.bills.reduce((sum: number, b: any) => {
+            if (b.status === 'PENDING') {
+              return sum + (Number(b.billAmount) || 0);
+            } else if (b.status === 'PARTIAL') {
+              return sum + ((Number(b.billAmount) || 0) - (Number(b.receivedAmount) || 0));
+            }
+            return sum;
+          }, 0);
+
+          const percentReceived = projectBudget > 0 ? (projectReceived / projectBudget) * 100 : 0;
+
+          // Shade variation for projects under same client
+          // Lightness ranges from 55% to 75% based on project index
+          const projectCount = client.projects.length;
+          const lightnessStep = projectCount > 1 ? 20 / (projectCount - 1) : 0;
+          const lightness = 55 + (projIdx * lightnessStep);
 
           return {
             name: project.projectName,
-            value: projectTotal || 1,
-            fill: `hsl(${hue}, 70%, 55%)`, // Medium shade for project ring
-            children: project.bills.map((bill: any, billIdx: number) => {
-              const received = Number(bill.receivedAmount) || 0;
-              const total = Number(bill.billAmount) || 0;
-              const percentReceived = total > 0 ? (received / total) * 100 : 0;
-
-              // Lightness calculation: Paid bills are lighter, unpaid darker
-              // Range: 65% to 90% lightness
-              const lightness = 65 + (percentReceived / 100) * 25;
-
-              return {
-                name: bill.billName || bill.slNo || `Bill ${billIdx + 1}`,
-                value: Number(bill.billAmount),
-                fill: `hsl(${hue}, 75%, ${lightness}%)`,
-                received: Number(bill.receivedAmount) || 0,
-                remaining: Number(bill.remainingAmount) || 0,
-                percentReceived: Math.round(percentReceived),
-              };
-            }),
+            value: projectBudget || 1,
+            fill: `hsl(${hue}, 65%, ${Math.min(lightness, 75)}%)`, // Lighter shades for outer ring
+            received: projectReceived,
+            remaining: projectRemaining,
+            percentReceived: Math.round(percentReceived),
+            billCount: project.bills.length,
+            clientName: client.name,
           };
         }),
       };
