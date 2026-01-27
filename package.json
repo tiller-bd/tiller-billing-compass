@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "set port=60 && next dev",
+    "dev": "PORT=60 next dev",
     "build": "next build",
-    "start": "set port=60 && next start",
+    "start": "PORT=60 next start",
     "lint": "next lint",
     "test": "jest",
     "create-admin": "tsx scripts/create-admin.ts"

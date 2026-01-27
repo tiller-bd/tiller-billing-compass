@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set("auth_session", JSON.stringify(safeUser), {
       httpOnly: true, // Prevents JS access
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: false, // Set to true when using HTTPS in production
+      sameSite: "lax", // "strict" can cause issues with redirects; "lax" is safer for HTTP
       maxAge: 60 * 60 * 24, // 1 day
       path: "/",
     });

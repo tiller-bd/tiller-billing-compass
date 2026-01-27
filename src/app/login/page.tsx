@@ -20,6 +20,8 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      console.log("use effect theke nicche");
+      
       router.push('/');
     }
   }, [isAuthenticated, router]);
@@ -31,6 +33,8 @@ export default function Login() {
 
     const result = await login(email, password);
     if (result.success) {
+      console.log("login done");
+      
       router.push('/');
     } else {
       setError(result.error || 'Login failed');
