@@ -13,6 +13,7 @@ interface AuthContextType {
   isLocked: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  lock: () => void;
   unlock: () => void;
 }
 
@@ -90,8 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
+  const lock = () => setIsLocked(true);
+  const unlock = () => setIsLocked(false);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLocked, login, logout, unlock: () => setIsLocked(false) }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLocked, login, logout, lock, unlock }}>
       {children}
     </AuthContext.Provider>
   );

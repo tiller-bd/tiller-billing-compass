@@ -91,7 +91,7 @@ export function Header({ title }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 md:h-16 border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-40">
+      <header className="h-14 md:h-16 border-b border-border/50 bg-background/70 backdrop-blur-xl sticky top-0 z-40 shadow-sm">
         <div className="h-full px-4 md:px-6 flex items-center justify-between">
           {/* Title - Smaller on mobile */}
           <div className="flex-1 min-w-0">

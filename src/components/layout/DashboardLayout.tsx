@@ -60,7 +60,25 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
 
   return (
     <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-      <div className="min-h-screen bg-background relative overflow-hidden flex">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/80 relative overflow-hidden flex">
+        {/* Background Pattern */}
+        <div className="fixed inset-0 pointer-events-none">
+          {/* Soft gradient from top-left */}
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/[0.08] via-transparent to-transparent" />
+
+          {/* Soft gradient from bottom-right */}
+          <div className="absolute bottom-0 right-0 w-full h-full bg-gradient-to-tl from-emerald-500/[0.06] via-transparent to-transparent" />
+
+          {/* Subtle dot pattern */}
+          <div
+            className="absolute inset-0 opacity-[0.4]"
+            style={{
+              backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--primary) / 0.15) 1px, transparent 0)`,
+              backgroundSize: '24px 24px',
+            }}
+          />
+        </div>
+
         {/* Full screen lock overlay - z-index higher than sidebar */}
         <AnimatePresence>
           {isLocked && (

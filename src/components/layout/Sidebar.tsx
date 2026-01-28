@@ -12,7 +12,8 @@ import {
   Briefcase,
   ReceiptText,
   LogOut,
-  Receipt
+  Receipt,
+  Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ const navItems = [
 
 export function Sidebar() {
   const { collapsed, setCollapsed } = useSidebarContext();
-  const { logout, user } = useAuth();
+  const { logout, lock, user } = useAuth();
   const pathname = usePathname();
 
   return (
@@ -41,9 +42,9 @@ export function Sidebar() {
       initial={false}
       animate={{ width: collapsed ? 80 : 280 }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-50"
+      className="fixed left-0 top-0 h-screen bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border/50 flex flex-col z-50 shadow-lg"
     >
-      <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border/50 bg-gradient-to-r from-primary/[0.02] to-transparent">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
             <Image width="40" height="40" src={tillerLogo} alt="Tiller Logo" className='object-cover' />
@@ -105,10 +106,29 @@ export function Sidebar() {
             </Link>
           </div>
         )}
-        <Button onClick={logout} variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
-          <LogOut className="w-4 h-4" />
-          {!collapsed && <span>Sign Out</span>}
-        </Button>
+        <div className={cn("flex gap-2", collapsed ? "flex-col" : "flex-row")}>
+          <Button
+            onClick={lock}
+            variant="outline"
+            size={collapsed ? "icon" : "default"}
+            className={cn(
+              "gap-2 border-amber-500/50 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10",
+              !collapsed && "flex-1"
+            )}
+          >
+            <Lock className="w-4 h-4" />
+            {!collapsed && <span>Lock</span>}
+          </Button>
+          <Button
+            onClick={logout}
+            variant="destructive"
+            size={collapsed ? "icon" : "default"}
+            className={cn(!collapsed && "flex-1")}
+          >
+            <LogOut className="w-4 h-4" />
+            {!collapsed && <span>Sign Out</span>}
+          </Button>
+        </div>
       </div>
 
       <button

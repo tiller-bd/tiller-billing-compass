@@ -101,9 +101,10 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card border border-border/60;
+    @apply bg-card/90 backdrop-blur-sm border border-border/60;
     box-shadow: var(--shadow-card);
   }
+
 
   .glow-effect {
     position: relative;
