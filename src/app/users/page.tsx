@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal } from 'lucide-react';
+import { UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal, KeyRound } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,12 @@ export default function Users() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({ name: '', email: '', role: 'USER' as UserRole, password: '' });
+
+  // Password change state
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const isSuperAdmin = currentUser?.role === 'SUPERADMIN';
 
@@ -87,6 +93,55 @@ export default function Users() {
     setLoading(false);
   };
 
+  const openPasswordDialog = (user: User) => {
+    setSelectedUserForPassword(user);
+    setPasswordData({ newPassword: '', confirmPassword: '' });
+    setIsPasswordDialogOpen(true);
+  };
+
+  const canChangePassword = (user: User) => {
+    // Super admin can change anyone's password
+    // Regular user can only change their own password
+    return isSuperAdmin || user.id === currentUser?.id;
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForPassword) return;
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({ title: 'Passwords do not match', variant: 'destructive' });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({ title: 'Password must be at least 6 characters', variant: 'destructive' });
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await fetch(`/api/users/${selectedUserForPassword.id}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordData.newPassword })
+      });
+
+      if (res.ok) {
+        toast({ title: 'Password Changed Successfully' });
+        setIsPasswordDialogOpen(false);
+        setSelectedUserForPassword(null);
+        setPasswordData({ newPassword: '', confirmPassword: '' });
+      } else {
+        const error = await res.json();
+        toast({ title: error.message || 'Failed to change password', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to change password', variant: 'destructive' });
+    }
+    setPasswordLoading(false);
+  };
+
   return (
     <DashboardLayout title="User Management">
       <div className="space-y-6">
@@ -114,7 +169,7 @@ export default function Users() {
                 <TableHead>
                   <SortableHeader label="Status" sortKey="is_active" currentSort={sortConfig} onSort={handleSort} />
                 </TableHead>
-                {isSuperAdmin && <TableHead>Actions</TableHead>}
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,22 +183,30 @@ export default function Users() {
                         {user.is_active ? 'Active' : 'Suspended'}
                     </Badge>
                   </TableCell>
-                  {isSuperAdmin && (
-                    <TableCell>
+                  <TableCell>
+                    {canChangePassword(user) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleToggleSuspend(user)} disabled={user.id === currentUser?.id}>
-                            {user.is_active ? <ShieldOff className="w-4 h-4 mr-2" /> : <Shield className="w-4 h-4 mr-2" />}
-                            {user.is_active ? 'Suspend' : 'Activate'}
+                          <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
+                            <KeyRound className="w-4 h-4 mr-2" />
+                            Change Password
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(user.id)} disabled={user.id === currentUser?.id} className="text-destructive">
-                            <Trash2 className="w-4 h-4 mr-2" /> Delete
-                          </DropdownMenuItem>
+                          {isSuperAdmin && (
+                            <>
+                              <DropdownMenuItem onClick={() => handleToggleSuspend(user)} disabled={user.id === currentUser?.id}>
+                                {user.is_active ? <ShieldOff className="w-4 h-4 mr-2" /> : <Shield className="w-4 h-4 mr-2" />}
+                                {user.is_active ? 'Suspend' : 'Activate'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(user.id)} disabled={user.id === currentUser?.id} className="text-destructive">
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  )}
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -166,6 +229,53 @@ export default function Users() {
               </Select>
             </div>
             <Button type="submit" className="w-full mt-4" disabled={loading}>{loading ? 'Creating...' : 'Register User'}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Change Password {selectedUserForPassword && selectedUserForPassword.id !== currentUser?.id && (
+                <span className="text-muted-foreground font-normal">for {selectedUserForPassword.full_name}</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePasswordChange} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                required
+                minLength={6}
+                value={passwordData.newPassword}
+                onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm Password</Label>
+              <Input
+                type="password"
+                required
+                minLength={6}
+                value={passwordData.confirmPassword}
+                onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                placeholder="Confirm new password"
+              />
+            </div>
+            {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+              <p className="text-sm text-destructive">Passwords do not match</p>
+            )}
+            <Button
+              type="submit"
+              className="w-full mt-4"
+              disabled={passwordLoading || passwordData.newPassword !== passwordData.confirmPassword}
+            >
+              {passwordLoading ? 'Changing...' : 'Change Password'}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

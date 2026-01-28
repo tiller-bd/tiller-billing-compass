@@ -60,6 +60,7 @@ model Project {
   startDate          DateTime?       @map("start_date") @db.Date
   endDate            DateTime?       @map("end_date") @db.Date
   totalProjectValue  Decimal?        @map("total_project_value") @db.Decimal(15, 2)
+  status             String?         @default("ONGOING") @db.VarChar(30)
   pgPercent          Decimal?        @map("pg_percent") @db.Decimal(5, 2)
   pgAmount           Decimal?        @map("pg_amount") @db.Decimal(15, 2)
   pgBankSharePercent Decimal?        @map("pg_bank_share_percent") @db.Decimal(5, 2)

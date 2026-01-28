@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { useSharedFilters, Suggestion } from '@/contexts/FilterContext';
+import { useSharedFilters, ProjectStatusFilter } from '@/contexts/FilterContext';
 import { Label } from '@/components/ui/label';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle2, CircleDollarSign } from 'lucide-react';
 import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
 
 interface Option {
@@ -13,11 +13,18 @@ interface Option {
   name: string;
 }
 
+const STATUS_OPTIONS: { value: ProjectStatusFilter; label: string; icon: typeof Clock }[] = [
+  { value: 'all', label: 'All Statuses', icon: Clock },
+  { value: 'ONGOING', label: 'Ongoing', icon: Clock },
+  { value: 'COMPLETED', label: 'Completed', icon: CheckCircle2 },
+  { value: 'PENDING_PAYMENT', label: 'Pending Payment', icon: CircleDollarSign },
+];
+
 export function DashboardFilter() {
   const {
     departmentId, setDepartmentId,
     clientId, setClientId,
-    projectId, setProjectId,
+    status, setStatus,
     yearType, setYearType,
     selectedYear, setSelectedYear,
     resetFilters,
@@ -27,7 +34,6 @@ export function DashboardFilter() {
 
   const [departments, setDepartments] = useState<Option[]>([]);
   const [clients, setClients] = useState<Option[]>([]);
-  const [projects, setProjects] = useState<Option[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,27 +73,22 @@ export function DashboardFilter() {
         const yearParam = getYearParam();
         const yearQuery = yearParam !== 'all' ? `?year=${yearParam}` : '';
 
-        const [departmentsRes, clientsRes, projectsRes] = await Promise.all([
+        const [departmentsRes, clientsRes] = await Promise.all([
           fetch(`/api/departments${yearQuery}`),
-          fetch(`/api/clients${yearQuery}`),
-          fetch(`/api/projects${yearQuery}`)
+          fetch(`/api/clients${yearQuery}`)
         ]);
 
         if (!departmentsRes.ok) throw new Error('Failed to fetch departments');
         if (!clientsRes.ok) throw new Error('Failed to fetch clients');
-        if (!projectsRes.ok) throw new Error('Failed to fetch projects');
 
         const departmentsData = await departmentsRes.json();
         const clientsData = await clientsRes.json();
-        const projectsData = await projectsRes.json();
 
         const newDepartments = departmentsData.map((d: any) => ({ id: d.id.toString(), name: d.name }));
         const newClients = clientsData.map((c: any) => ({ id: c.id.toString(), name: c.name }));
-        const newProjects = projectsData.map((p: any) => ({ id: p.id.toString(), name: p.projectName }));
 
         setDepartments(newDepartments);
         setClients(newClients);
-        setProjects(newProjects);
 
         // Reset selections if current value is no longer available
         if (departmentId !== 'all' && !newDepartments.some((d: Option) => d.id === departmentId)) {
@@ -95,9 +96,6 @@ export function DashboardFilter() {
         }
         if (clientId !== 'all' && !newClients.some((c: Option) => c.id === clientId)) {
           setClientId('all');
-        }
-        if (projectId !== 'all' && !newProjects.some((p: Option) => p.id === projectId)) {
-          setProjectId('all');
         }
 
       } catch (err: any) {
@@ -120,19 +118,19 @@ export function DashboardFilter() {
     setSelectedFilter(null); // Clear selected filter if dropdown is used
   }
 
-  const handleProjectChange = (value: string) => {
-    setProjectId(value);
+  const handleStatusChange = (value: string) => {
+    setStatus(value as ProjectStatusFilter);
     setSelectedFilter(null); // Clear selected filter if dropdown is used
   }
 
-  const getSelectValue = (type: 'department' | 'client' | 'project', currentId: string) => {
+  const getSelectValue = (type: 'department' | 'client' | 'status', currentId: string) => {
     if (selectedFilter && selectedFilter.type === type) {
       return selectedFilter.id;
     }
     return currentId;
   };
 
-  const isSelectDisabled = (type: 'department' | 'client' | 'project') => {
+  const isSelectDisabled = (type: 'department' | 'client' | 'status') => {
     return selectedFilter !== null && selectedFilter.type !== type;
   }
 
@@ -193,19 +191,23 @@ export function DashboardFilter() {
         </div>
 
         <div>
-          <Label htmlFor="project-filter" className="sr-only">Filter by Project</Label>
+          <Label htmlFor="status-filter" className="sr-only">Filter by Status</Label>
           <Select
-            value={getSelectValue('project', projectId)}
-            onValueChange={handleProjectChange}
-            disabled={isSelectDisabled('project')}
+            value={getSelectValue('status', status)}
+            onValueChange={handleStatusChange}
+            disabled={isSelectDisabled('status')}
           >
-            <SelectTrigger className="w-[130px] md:w-[180px] h-9 md:h-10 text-xs md:text-sm">
-              <SelectValue placeholder="All Projects" />
+            <SelectTrigger className="w-[140px] md:w-[180px] h-9 md:h-10 text-xs md:text-sm">
+              <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((proj) => (
-                <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <div className="flex items-center gap-2">
+                    <opt.icon className="w-3.5 h-3.5" />
+                    <span>{opt.label}</span>
+                  </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

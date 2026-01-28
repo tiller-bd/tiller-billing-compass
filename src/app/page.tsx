@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
-  const { departmentId, clientId, projectId, yearType, selectedYear } = useSharedFilters();
+  const { departmentId, clientId, status, yearType, selectedYear } = useSharedFilters();
 
   // Construct year parameter with prefix for API calls
   // "all" means no year filter
@@ -85,7 +85,7 @@ export default function DashboardPage() {
     const params = new URLSearchParams();
     if (departmentId !== 'all') params.append('departmentId', departmentId);
     if (clientId !== 'all') params.append('clientId', clientId);
-    if (projectId !== 'all') params.append('projectId', projectId);
+    if (status !== 'all') params.append('status', status);
     return params.toString();
   };
 
@@ -104,7 +104,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('metrics', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchRevenue = useCallback(async () => {
     updateLoading('revenue', true);
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('revenue', false);
     }
-  }, [yearParam, departmentId, clientId, projectId]);
+  }, [yearParam, departmentId, clientId, status]);
 
   const fetchRevenueYearly = useCallback(async () => {
     updateLoading('revenueYearly', true);
@@ -136,7 +136,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('revenueYearly', false);
     }
-  }, [departmentId, clientId, projectId]);
+  }, [departmentId, clientId, status]);
 
   const fetchDistribution = useCallback(async () => {
     updateLoading('distribution', true);
@@ -152,7 +152,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('distribution', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchBudgetComparison = useCallback(async () => {
     updateLoading('budget', true);
@@ -168,7 +168,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('budget', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchLastReceived = useCallback(async () => {
     updateLoading('lastReceived', true);
@@ -184,7 +184,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('lastReceived', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchDeadlines = useCallback(async () => {
     updateLoading('deadlines', true);
@@ -200,7 +200,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('deadlines', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchCalendar = useCallback(async () => {
     updateLoading('calendar', true);
@@ -216,7 +216,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('calendar', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
   const fetchProjects = useCallback(async () => {
     updateLoading('projects', true);
@@ -232,7 +232,7 @@ export default function DashboardPage() {
     } finally {
       updateLoading('projects', false);
     }
-  }, [departmentId, clientId, projectId, yearParam]);
+  }, [departmentId, clientId, status, yearParam]);
 
 
   useEffect(() => {
@@ -245,7 +245,7 @@ export default function DashboardPage() {
     fetchDeadlines();
     fetchCalendar();
     fetchProjects();
-  }, [yearParam, departmentId, clientId, projectId, fetchMetrics, fetchRevenue, fetchRevenueYearly, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
+  }, [yearParam, departmentId, clientId, status, fetchMetrics, fetchRevenue, fetchRevenueYearly, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh

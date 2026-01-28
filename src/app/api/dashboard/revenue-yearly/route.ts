@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-error";
+import { filterProjectsByEffectiveStatus } from "@/lib/project-status";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
-    const projectId = searchParams.get("projectId");
+    const status = searchParams.get("status");
 
     const projectWhere: any = {};
     if (search) {
@@ -27,22 +28,32 @@ export async function GET(request: NextRequest) {
     if (clientId && clientId !== "all") {
       projectWhere.clientId = parseInt(clientId);
     }
-    if (projectId && projectId !== "all") {
-      projectWhere.id = parseInt(projectId);
-    }
+    // Note: status filter is applied after fetching using effective status logic
 
-    // Get all PAID and PARTIAL bills with receivedDate
-    const bills = await prisma.projectBill.findMany({
-      where: {
-        receivedDate: { not: null },
-        status: { in: ["PAID", "PARTIAL"] },
-        project: projectWhere,
-      },
-      select: {
-        receivedDate: true,
-        receivedAmount: true,
-      },
+    // Fetch projects with their bills for effective status calculation
+    const allProjects = await prisma.project.findMany({
+      where: projectWhere,
+      include: { bills: true },
     });
+
+    // Apply effective status filter
+    const filteredProjects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
+    const filteredProjectIds = filteredProjects.map(p => p.id);
+
+    // Get PAID and PARTIAL bills with receivedDate from filtered projects
+    const bills = filteredProjectIds.length > 0
+      ? await prisma.projectBill.findMany({
+          where: {
+            projectId: { in: filteredProjectIds },
+            receivedDate: { not: null },
+            status: { in: ["PAID", "PARTIAL"] },
+          },
+          select: {
+            receivedDate: true,
+            receivedAmount: true,
+          },
+        })
+      : [];
 
     // Aggregate by year
     const yearlyMap = new Map<number, number>();

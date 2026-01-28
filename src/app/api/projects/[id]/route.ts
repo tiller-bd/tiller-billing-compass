@@ -53,11 +53,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { projectName, startDate, endDate, totalProjectValue, clientId, departmentId, categoryId, pg } = body;
+    const { projectName, startDate, endDate, totalProjectValue, clientId, departmentId, categoryId, pg, status } = body;
 
-    // Validate the project exists
+    // Validate the project exists and get bills for status validation
     const existingProject = await prisma.project.findUnique({
       where: { id: parsedId },
+      include: { bills: true },
     });
 
     if (!existingProject) {
@@ -100,6 +101,15 @@ export async function PATCH(
 
     if (categoryId !== undefined) {
       updateData.categoryId = parseInt(categoryId);
+    }
+
+    // Handle status updates
+    if (status !== undefined) {
+      const validStatuses = ['ONGOING', 'COMPLETED', 'PENDING_PAYMENT'];
+      if (!validStatuses.includes(status)) {
+        return apiError("Invalid status. Must be ONGOING, COMPLETED, or PENDING_PAYMENT", "VALIDATION_ERROR");
+      }
+      updateData.status = status;
     }
 
     // Handle PG updates

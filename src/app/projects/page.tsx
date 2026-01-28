@@ -348,6 +348,7 @@ export default function ProjectsPage() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="ONGOING">Ongoing</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="PENDING_PAYMENT">Pending Payment</SelectItem>
               </SelectContent>
             </Select>
             {/* Year Type Selector - Fiscal prioritized */}
@@ -397,9 +398,10 @@ export default function ProjectsPage() {
                 clientName: p.client?.name || 'Unknown',
                 signDate: p.startDate,
                 totalBudget: Number(p.totalProjectValue),
-                status: p.bills?.every((b: any) => b.status === 'PAID') ? 'COMPLETED' : 'ONGOING'
+                status: p.effectiveStatus || p.status || 'ONGOING'
               }))}
               onProjectClick={(project: any) => router.push(`/projects/${project.id}`)}
+              onRefresh={fetchProjects}
             />
 
             {/* Charts - Hidden on mobile for performance, shown on tablet+ */}

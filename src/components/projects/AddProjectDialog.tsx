@@ -61,6 +61,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       departmentId: "",
       totalProjectValue: "",
       startDate: getCurrentDate(),
+      endDate: "",
       newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
       newCategory: { name: "", description: "" },
       newDepartment: { name: "", description: "" },
@@ -187,7 +188,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       return () => clearTimeout(timeoutId);
     }
   }, [watchedBills, watch("projectName"), watch("totalProjectValue"), watch("clientId"),
-    watch("categoryId"), watch("departmentId"), watch("startDate"),
+    watch("categoryId"), watch("departmentId"), watch("startDate"), watch("endDate"),
     watch("newClient"), watch("newCategory"), watch("newDepartment"), watchedPg,
     ignoreTotalCheck, isNewClient, isNewCategory, isNewDepartment, pgEnabled, pgInputType, open, getValues]);
 
@@ -539,6 +540,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
         departmentId: "",
         totalProjectValue: "",
         startDate: getCurrentDate(),
+        endDate: "",
         newClient: { name: "", contactPerson: "", contactEmail: "", contactPhone: "" },
         newCategory: { name: "", description: "" },
         newDepartment: { name: "", description: "" },
@@ -728,7 +730,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Client Entity</Label>
               <Select
@@ -798,6 +800,11 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Agreement Date</Label>
               <Input type="date" {...register("startDate")} className="h-10" required />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">End Date</Label>
+              <Input type="date" {...register("endDate")} className="h-10" />
             </div>
           </div>
 

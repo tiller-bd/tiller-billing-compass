@@ -9,6 +9,7 @@ import {
   getFiscalMonthIndex,
   getCurrentFiscalYear,
 } from "@/lib/date-utils";
+import { filterProjectsByEffectiveStatus } from "@/lib/project-status";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || "";
   const departmentId = searchParams.get("departmentId");
   const clientId = searchParams.get("clientId");
-  const projectId = searchParams.get("projectId");
+  const status = searchParams.get("status");
 
   // Handle "all" year - default to current fiscal year for monthly chart
   // (monthly breakdown only makes sense within a single year)
@@ -46,24 +47,31 @@ export async function GET(request: NextRequest) {
   if (clientId && clientId !== "all") {
     projectWhere.clientId = parseInt(clientId);
   }
-  if (projectId && projectId !== "all") {
-    projectWhere.id = parseInt(projectId);
-  }
+  // Note: status filter is applied after fetching using effective status logic
 
-  // Revenue chart shows receivedAmount from PAID and PARTIAL bills
-  const bills = await prisma.projectBill.findMany({
-    where: {
-      receivedDate: {
-        gte: start,
-        lte: end,
-      },
-      status: { in: ["PAID", "PARTIAL"] },
-      project: projectWhere,
-    },
-    include: {
-      project: true,
-    },
+  // Fetch projects with their bills for effective status calculation
+  const allProjects = await prisma.project.findMany({
+    where: projectWhere,
+    include: { bills: true },
   });
+
+  // Apply effective status filter
+  const filteredProjects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
+  const filteredProjectIds = filteredProjects.map(p => p.id);
+
+  // Get bills from filtered projects within date range
+  const bills = filteredProjectIds.length > 0
+    ? await prisma.projectBill.findMany({
+        where: {
+          projectId: { in: filteredProjectIds },
+          receivedDate: {
+            gte: start,
+            lte: end,
+          },
+          status: { in: ["PAID", "PARTIAL"] },
+        },
+      })
+    : [];
 
   // Use appropriate month ordering based on year type
   const months = isFiscal ? getFiscalYearMonths() : getCalendarYearMonths();

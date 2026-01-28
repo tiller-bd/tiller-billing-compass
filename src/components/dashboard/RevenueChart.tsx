@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Calendar, CalendarDays } from 'lucide-react';
@@ -26,6 +26,13 @@ export function RevenueChart({
   isAllYears = false
 }: RevenueChartProps) {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+
+  // Reset to monthly view when switching away from "All Years"
+  useEffect(() => {
+    if (!isAllYears) {
+      setViewMode('monthly');
+    }
+  }, [isAllYears]);
 
   const formatCurrency = (value: number) => {
     const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value));

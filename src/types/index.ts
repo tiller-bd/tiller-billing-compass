@@ -2,7 +2,11 @@
 
 export type UserRole = 'USER' | 'SUPERADMIN';
 
-export type ProjectStatus = 'FUTURE' | 'ONGOING' | 'COMPLETED';
+// Project Status:
+// ONGOING - Project is actively running
+// COMPLETED - Project finished successfully (all bills paid)
+// PENDING_PAYMENT - Project ended but has unpaid bills
+export type ProjectStatus = 'ONGOING' | 'COMPLETED' | 'PENDING_PAYMENT';
 
 export type ProjectCategory = 'SOFTWARE_DEV' | 'PLANNING_DEV';
 

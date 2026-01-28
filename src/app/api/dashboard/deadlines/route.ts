@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { handlePrismaError } from '@/lib/api-error';
 import { parseYearValue, getYearDateRange } from '@/lib/date-utils';
+import { filterProjectsByEffectiveStatus } from '@/lib/project-status';
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
-    const projectId = searchParams.get("projectId");
+    const status = searchParams.get("status");
     const yearParam = searchParams.get("year");
 
     const projectWhere: any = {};
@@ -32,16 +33,27 @@ export async function GET(request: NextRequest) {
       const parsed = parseInt(clientId);
       if (!isNaN(parsed)) projectWhere.clientId = parsed;
     }
-    if (projectId && projectId !== "all") {
-      const parsed = parseInt(projectId);
-      if (!isNaN(parsed)) projectWhere.id = parsed;
+    // Note: status filter is applied after fetching using effective status logic
+
+    // Fetch projects with their bills for effective status calculation
+    const allProjects = await prisma.project.findMany({
+      where: projectWhere,
+      include: { bills: true },
+    });
+
+    // Apply effective status filter
+    const filteredProjects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
+    const filteredProjectIds = filteredProjects.map(p => p.id);
+
+    if (filteredProjectIds.length === 0) {
+      return NextResponse.json([]);
     }
 
     // Build bill where clause
     const billWhere: any = {
+      projectId: { in: filteredProjectIds },
       status: { not: 'PAID' },
       tentativeBillingDate: { gte: new Date() },
-      project: projectWhere,
     };
 
     // Year filter on tentativeBillingDate (skip if "all")

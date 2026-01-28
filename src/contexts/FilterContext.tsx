@@ -6,8 +6,10 @@ import { YearType } from '@/lib/date-utils';
 export interface Suggestion {
   id: string;
   name: string;
-  type: 'department' | 'client' | 'project';
+  type: 'department' | 'client' | 'status';
 }
+
+export type ProjectStatusFilter = 'all' | 'ONGOING' | 'COMPLETED' | 'PENDING_PAYMENT';
 
 interface FilterContextType {
   search: string;
@@ -17,8 +19,8 @@ interface FilterContextType {
   setDepartmentId: (id: string) => void;
   clientId: string;
   setClientId: (id: string) => void;
-  projectId: string;
-  setProjectId: (id: string) => void;
+  status: ProjectStatusFilter;
+  setStatus: (status: ProjectStatusFilter) => void;
   yearType: YearType;
   setYearType: (type: YearType) => void;
   selectedYear: string;
@@ -34,7 +36,7 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
   const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState('all');
   const [clientId, setClientId] = useState('all');
-  const [projectId, setProjectId] = useState('all');
+  const [status, setStatus] = useState<ProjectStatusFilter>('all');
   // Default to all years (no filter)
   const [yearType, setYearType] = useState<YearType>('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -46,7 +48,7 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
     setSearch('');
     setDepartmentId('all');
     setClientId('all');
-    setProjectId('all');
+    setStatus('all');
     setYearType('all');
     setSelectedYear('all');
     setSelectedFilter(null);
@@ -61,8 +63,8 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
       setDepartmentId,
       clientId,
       setClientId,
-      projectId,
-      setProjectId,
+      status,
+      setStatus,
       yearType,
       setYearType,
       selectedYear,

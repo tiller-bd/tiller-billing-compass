@@ -2,11 +2,16 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
+
 import {
   Settings2,
   MoreHorizontal,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2,
+  CircleDollarSign,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +31,7 @@ import { SortableHeader, useSorting } from '@/components/ui/sortable-header';
 interface ProjectTableProps {
   projects: any[];
   onProjectClick?: (project: any) => void;
+  onRefresh?: () => void;
 }
 
 // --- Exported Skeleton Component ---
@@ -63,13 +69,14 @@ export function ProjectTableSkeleton() {
 }
 
 // --- Main Table Component ---
-export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
+export function ProjectTable({ projects, onProjectClick, onRefresh }: ProjectTableProps) {
   const [visibleColumns, setVisibleColumns] = useState({
     client: true,
     date: true,
     status: true,
     progress: true,
   });
+  const [updatingProjectId, setUpdatingProjectId] = useState<number | null>(null);
 
   // Prepare data with computed fields for sorting
   const projectsWithComputed = useMemo(() => {
@@ -110,10 +117,79 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
     return { label: "??", color: "bg-muted text-muted-foreground border-border" };
   };
 
+  // Helper for Status Badge styling
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'COMPLETED':
+        return { label: 'Completed', color: 'bg-green-500/10 text-green-600 border-green-500/20' };
+      case 'PENDING_PAYMENT':
+        return { label: 'Pending Payment', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
+      case 'ONGOING':
+      default:
+        return { label: 'Ongoing', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
+    }
+  };
+
   // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
   const formatFullCurrency = (val: number) => {
     const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(val));
     return `৳${formatted}`;
+  };
+
+  // Check if "Mark as Completed" button should show
+  // Shows if: budget is 100% paid OR end date has passed
+  const shouldShowMarkComplete = (project: any) => {
+    // Don't show if already completed
+    if (project.status === 'COMPLETED') return false;
+
+    const recPct = project._receivedPct || 0;
+    const isFullyPaid = recPct >= 100;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = project.endDate ? new Date(project.endDate) : null;
+    const isEndDatePassed = endDate && endDate < today;
+
+    return isFullyPaid || isEndDatePassed;
+  };
+
+  // Determine what status to set when marking complete
+  const getTargetStatus = (project: any): 'COMPLETED' | 'PENDING_PAYMENT' => {
+    const recPct = project._receivedPct || 0;
+    const isFullyPaid = recPct >= 100;
+
+    // If 100% paid -> COMPLETED, otherwise -> PENDING_PAYMENT
+    return isFullyPaid ? 'COMPLETED' : 'PENDING_PAYMENT';
+  };
+
+  // Handle marking project as complete
+  const handleMarkComplete = async (project: any) => {
+    const targetStatus = getTargetStatus(project);
+    setUpdatingProjectId(project.id);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update status');
+      }
+
+      toast.success(
+        targetStatus === 'COMPLETED'
+          ? 'Project marked as Completed'
+          : 'Project marked as Pending Payment'
+      );
+      onRefresh?.();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update status');
+    } finally {
+      setUpdatingProjectId(null);
+    }
   };
 
   return (
@@ -174,8 +250,8 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
                   <Badge variant="outline" className={cn("text-[9px] h-5 px-1.5 font-bold border", dept.color)}>
                     {dept.label}
                   </Badge>
-                  <Badge variant="secondary" className="text-[9px] h-5 px-1.5 font-semibold">
-                    {p.status}
+                  <Badge variant="outline" className={cn("text-[9px] h-5 px-1.5 font-semibold border", getStatusBadge(p.status).color)}>
+                    {getStatusBadge(p.status).label}
                   </Badge>
                 </div>
               </div>
@@ -206,12 +282,36 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
                 </div>
               </div>
 
-              {/* Date */}
+              {/* Date & Actions */}
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   Signed: {p.startDate ? format(new Date(p.startDate), 'MMM d, yyyy') : 'N/A'}
                 </span>
-                <ExternalLink size={14} className="text-primary" />
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  {shouldShowMarkComplete(p) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 px-2 text-[10px] font-bold",
+                        getTargetStatus(p) === 'COMPLETED'
+                          ? "text-green-600 hover:text-green-700"
+                          : "text-amber-600 hover:text-amber-700"
+                      )}
+                      disabled={updatingProjectId === p.id}
+                      onClick={() => handleMarkComplete(p)}
+                    >
+                      {updatingProjectId === p.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : getTargetStatus(p) === 'COMPLETED' ? (
+                        <><CheckCircle2 size={12} className="mr-1" /> Complete</>
+                      ) : (
+                        <><CircleDollarSign size={12} className="mr-1" /> Pending</>
+                      )}
+                    </Button>
+                  )}
+                  <ExternalLink size={14} className="text-primary" />
+                </div>
               </div>
             </div>
           );
@@ -298,20 +398,43 @@ export function ProjectTable({ projects, onProjectClick }: ProjectTableProps) {
                   )}
                   {visibleColumns.status && (
                     <td className="p-4">
-                      <Badge variant="secondary" className="text-[10px] font-semibold py-0 h-5">
-                        {p.status}
+                      <Badge variant="outline" className={cn("text-[10px] font-semibold py-0 h-5 border", getStatusBadge(p.status).color)}>
+                        {getStatusBadge(p.status).label}
                       </Badge>
                     </td>
                   )}
                   <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal size={16} /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          {updatingProjectId === p.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <MoreHorizontal size={16} />
+                          )}
+                        </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem onClick={() => onProjectClick?.(p)}>
                           <ExternalLink className="w-3.5 h-3.5 mr-2" /> View Details
                         </DropdownMenuItem>
+                        {shouldShowMarkComplete(p) && (
+                          <DropdownMenuItem
+                            onClick={() => handleMarkComplete(p)}
+                            disabled={updatingProjectId === p.id}
+                            className={getTargetStatus(p) === 'COMPLETED' ? 'text-green-600' : 'text-amber-600'}
+                          >
+                            {getTargetStatus(p) === 'COMPLETED' ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Mark as Completed
+                              </>
+                            ) : (
+                              <>
+                                <CircleDollarSign className="w-3.5 h-3.5 mr-2" /> Mark as Pending Payment
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { parseYearValue, getYearDateRange } from '@/lib/date-utils';
+import { filterProjectsByEffectiveStatus } from '@/lib/project-status';
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
     const clientId = searchParams.get("clientId");
-    const projectId = searchParams.get("projectId");
+    const status = searchParams.get("status");
     const yearParam = searchParams.get("year");
 
     const projectWhere: any = {};
@@ -28,9 +29,7 @@ export async function GET(request: NextRequest) {
     if (clientId && clientId !== "all") {
       projectWhere.clientId = parseInt(clientId);
     }
-    if (projectId && projectId !== "all") {
-      projectWhere.id = parseInt(projectId);
-    }
+    // Note: status filter is applied after fetching using effective status logic
 
     // Parse year filter if provided (and not "all")
     let dateRange: { start: Date; end: Date } | null = null;
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
       dateRange = getYearDateRange(year, isFiscal);
     }
 
-    const projects = await prisma.project.findMany({
+    const allProjects = await prisma.project.findMany({
       where: projectWhere,
       include: {
         client: true,
@@ -51,6 +50,9 @@ export async function GET(request: NextRequest) {
         startDate: 'desc',
       },
     });
+
+    // Apply effective status filter
+    const projects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
 
     // Helper to check if a bill falls within the date range
     const isBillInDateRange = (bill: any): boolean => {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError, apiError } from "@/lib/api-error";
 import { parseYearValue, getYearDateRange } from "@/lib/date-utils";
+import { filterProjectsByEffectiveStatus, addEffectiveStatus } from "@/lib/project-status";
 
 export async function GET(request: NextRequest) {
   const session = await verifyAuth();
@@ -80,18 +81,13 @@ export async function GET(request: NextRequest) {
           .filter((p) => p.bills.length > 0)
       : projects;
 
-    // Additional filtering for complex status logic if needed
-    if (status && status !== "all") {
-      filtered = filtered.filter((p) => {
-        const isPaid =
-          p.bills.length > 0 && p.bills.every((b) => b.status === "PAID");
-        if (status === "COMPLETED") return isPaid;
-        if (status === "ONGOING") return !isPaid && p.bills.length > 0;
-        return true;
-      });
-    }
+    // Apply effective status filter (considers computed status based on bills, end date, etc.)
+    filtered = filterProjectsByEffectiveStatus(filtered, status || 'all');
 
-    return NextResponse.json(filtered);
+    // Add effective status to each project for frontend display
+    const result = addEffectiveStatus(filtered);
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Projects fetch error:", error);
     return handlePrismaError(error);
@@ -142,6 +138,7 @@ export async function POST(request: NextRequest) {
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
         totalProjectValue: parseFloat(totalProjectValue) || 0,
+        status: 'ONGOING', // Default status for new projects
         bills: {
           create: (bills || []).map((bill: any) => ({
             billName: bill.billName,

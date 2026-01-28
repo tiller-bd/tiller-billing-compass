@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { RecordPaymentDialog } from '@/components/billing/RecordPaymentDialog';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { EditBillDialog } from '@/components/billing/EditBillDialog';
+import { ChangeStatusDialog } from '@/components/projects/ChangeStatusDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -193,6 +194,14 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
             <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to</span> Projects
           </Button>
           <div className="flex items-center gap-2">
+            <ChangeStatusDialog
+              project={project}
+              onSuccess={() => {
+                fetch(`/api/projects/${id}`)
+                  .then(res => res.json())
+                  .then(data => setProject(data));
+              }}
+            />
             <EditProjectDialog
               project={project}
               onSuccess={() => {
