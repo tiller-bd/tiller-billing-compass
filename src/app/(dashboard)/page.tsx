@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Wallet, TrendingUp, TrendingDown, FolderKanban, Maximize2, RefreshCw, X, Shield } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ProjectDistributionChart } from '@/components/dashboard/ProjectDistributionChart';
@@ -254,8 +253,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardLayout title="Dashboard" >
-
+    <>
       {/* Expanded View Modal - Full screen on mobile */}
       {expandedCard && (
         <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
@@ -435,6 +433,6 @@ export default function DashboardPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

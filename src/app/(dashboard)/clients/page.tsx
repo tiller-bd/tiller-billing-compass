@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { PieChart as PieIcon, TrendingUp, Settings2, RefreshCw } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,7 +60,6 @@ export default function ClientsPage() {
   };
 
   return (
-    <DashboardLayout title="Client Registry" >
       <div className="space-y-8">
         
         {/* Comparative Charts - Hidden on small mobile, stacked on tablet */}
@@ -235,6 +233,5 @@ export default function ClientsPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

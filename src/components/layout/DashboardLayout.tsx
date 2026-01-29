@@ -23,12 +23,30 @@ export function useSidebarContext() {
   return context;
 }
 
-interface DashboardLayoutProps {
-  children: ReactNode;
-  title: string;
+const TITLE_MAP: Record<string, string> = {
+  '/': 'Dashboard',
+  '/projects': 'Projects',
+  '/billing': 'Billing',
+  '/clients': 'Client Registry',
+  '/users': 'User Management',
+};
+
+function getTitleFromPathname(pathname: string): string {
+  // Exact match first
+  if (TITLE_MAP[pathname]) return TITLE_MAP[pathname];
+  // Dynamic route matches
+  if (/^\/projects\/[^/]+$/.test(pathname)) return 'Project Analytics';
+  if (/^\/clients\/[^/]+$/.test(pathname)) return 'Client Intelligence';
+  // Fallback to base route match
+  const base = '/' + pathname.split('/')[1];
+  return TITLE_MAP[base] || 'Dashboard';
 }
 
-export function DashboardLayout({ children, title }: DashboardLayoutProps) {
+interface DashboardLayoutProps {
+  children: ReactNode;
+}
+
+export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { user, isLocked, unlock, isAuthenticated } = useAuth();
@@ -109,7 +127,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         >
           {/* Fixed Header - Outside scrollable area */}
           <div className="sticky top-0 z-40">
-            <Header title={title} />
+            <Header title={getTitleFromPathname(pathname)} />
           </div>
 
           {/* Scrollable Content Wrapper */}
@@ -133,7 +151,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         <div className="flex md:hidden flex-1 flex-col min-w-0 min-h-screen">
           {/* Mobile Header */}
           <div className="sticky top-0 z-40">
-            <Header title={title} />
+            <Header title={getTitleFromPathname(pathname)} />
           </div>
 
           {/* Mobile Content - with bottom padding for nav */}

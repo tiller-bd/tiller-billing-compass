@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { RefreshCw, BarChart3, TrendingUp, Wallet, TrendingDown, FolderKanban, Shield } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProjectTable, ProjectTableSkeleton } from '@/components/projects/ProjectTable';
 import { AddProjectDialog } from '@/components/projects/AddProjectDialog';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -231,7 +230,6 @@ export default function ProjectsPage() {
   const hasPgData = metrics.pgDeposited > 0 || metrics.pgCleared > 0 || metrics.pgPending > 0;
 
   return (
-    <DashboardLayout title="Projects" >
       <div className="space-y-4 md:space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-lg md:text-2xl font-bold">Project Management</h1>
@@ -441,6 +439,5 @@ export default function ProjectsPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

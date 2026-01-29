@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 export default function ProjectsError({
   error,
@@ -17,7 +16,6 @@ export default function ProjectsError({
   }, [error]);
 
   return (
-    <DashboardLayout title="Projects">
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="rounded-full bg-destructive/10 p-6 mb-6">
           <AlertTriangle className="h-12 w-12 text-destructive" />
@@ -37,6 +35,5 @@ export default function ProjectsError({
           </Button>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

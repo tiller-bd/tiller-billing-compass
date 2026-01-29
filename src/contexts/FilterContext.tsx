@@ -6,7 +6,7 @@ import { YearType } from '@/lib/date-utils';
 export interface Suggestion {
   id: string;
   name: string;
-  type: 'department' | 'client' | 'status';
+  type: 'department' | 'client' | 'project' | 'status';
 }
 
 export type ProjectStatusFilter = 'all' | 'ONGOING' | 'COMPLETED' | 'PENDING_PAYMENT';
@@ -19,6 +19,8 @@ interface FilterContextType {
   setDepartmentId: (id: string) => void;
   clientId: string;
   setClientId: (id: string) => void;
+  projectId: string;
+  setProjectId: (id: string) => void;
   status: ProjectStatusFilter;
   setStatus: (status: ProjectStatusFilter) => void;
   yearType: YearType;
@@ -36,6 +38,7 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
   const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState('all');
   const [clientId, setClientId] = useState('all');
+  const [projectId, setProjectId] = useState('all');
   const [status, setStatus] = useState<ProjectStatusFilter>('all');
   // Default to all years (no filter)
   const [yearType, setYearType] = useState<YearType>('all');
@@ -48,6 +51,7 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
     setSearch('');
     setDepartmentId('all');
     setClientId('all');
+    setProjectId('all');
     setStatus('all');
     setYearType('all');
     setSelectedYear('all');
@@ -63,6 +67,8 @@ export const SharedFilterProvider = ({ children }: { children: ReactNode }) => {
       setDepartmentId,
       clientId,
       setClientId,
+      projectId,
+      setProjectId,
       status,
       setStatus,
       yearType,

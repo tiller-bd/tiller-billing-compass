@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { UserPlus, Shield, ShieldOff, Trash2, MoreHorizontal, KeyRound } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -143,7 +142,7 @@ export default function Users() {
   };
 
   return (
-    <DashboardLayout title="User Management">
+    <>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Members</h1>
@@ -279,6 +278,6 @@ export default function Users() {
           </form>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

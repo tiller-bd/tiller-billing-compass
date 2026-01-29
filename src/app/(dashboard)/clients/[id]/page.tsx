@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Building2, TrendingUp, Sparkles, Award, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -75,7 +74,6 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     if (loading) return <div className="p-10 space-y-6"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
     return (
-        <DashboardLayout title="Client Intelligence" >
             <div className="space-y-10 pb-20">
                 <Button variant="ghost" onClick={() => router.push('/clients')} className="gap-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft size={16} /> All Clients</Button>
 
@@ -172,6 +170,5 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                     </div>
                 </div>
             </div>
-        </DashboardLayout>
     );
 }

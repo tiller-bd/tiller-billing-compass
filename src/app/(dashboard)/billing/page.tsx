@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { RefreshCw, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { BillingTable, BillingTableSkeleton } from '@/components/billing/BillingTable';
 import { AddBillDialog } from '@/components/billing/AddBillDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -177,7 +176,6 @@ export default function BillingMasterPage() {
   };
 
   return (
-    <DashboardLayout title="Billing" >
       <div className="space-y-4 md:space-y-6">
         <div className="flex justify-between items-center gap-2">
           <div className="min-w-0">
@@ -312,6 +310,5 @@ export default function BillingMasterPage() {
           />
         )}
       </div>
-    </DashboardLayout>
   );
 }
