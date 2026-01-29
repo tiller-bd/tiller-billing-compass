@@ -258,7 +258,7 @@ export default function DashboardPage() {
       {expandedCard && (
         <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
           <div className="bg-card  w-full max-w-6xl h-[90vh] md:h-[80vh] rounded-xl shadow-2xl relative p-1 md:p-3">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 md:top-4 md:right-4" onClick={() => setExpandedCard(null)}>
+            <Button variant="ghost" size="icon" className="absolute top-2 right-2 md:top-4 md:right-4 z-[9999]" onClick={() => setExpandedCard(null)}>
               <X className="h-5 w-5" />
             </Button>
             {expandedCard === 'revenue' && <RevenueChart data={revenue} yearlyData={revenueYearly} isExpanded isAllYears={selectedYear === 'all'} />}
