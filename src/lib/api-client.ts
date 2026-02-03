@@ -117,3 +117,34 @@ export const apiPatch = <T>(url: string, body: unknown, options?: FetchOptions) 
 
 export const apiDelete = <T>(url: string, options?: FetchOptions) =>
   apiFetch<T>(url, { ...options, method: 'DELETE' });
+
+export async function apiUpload<T>(url: string, formData: FormData): Promise<T> {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+      // No Content-Type header — browser sets multipart boundary automatically
+    });
+
+    return await handleResponse<T>(response, false);
+  } catch (error) {
+    if (error instanceof ApiClientError) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ApiClientError(
+        'Network error. Please check your connection.',
+        'CONNECTION_ERROR',
+        0
+      );
+    }
+
+    throw new ApiClientError(
+      error instanceof Error ? error.message : 'An unexpected error occurred',
+      'INTERNAL_ERROR',
+      500
+    );
+  }
+}

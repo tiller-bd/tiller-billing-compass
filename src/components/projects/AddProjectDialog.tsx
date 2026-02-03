@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,17 +18,18 @@ import {
   calculateAmountFromPercentage,
   isApproximatelyEqual,
 } from "@/lib/financial-utils";
+import { FileUploadZone, PendingFile } from "@/components/ui/file-upload-zone";
+import { apiUpload } from "@/lib/api-client";
 
 interface AddProjectDialogProps {
   onProjectAdded: () => void;
-  open?: boolean;
-  setOpen?: (open: boolean) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
 const DRAFT_KEY = "addProjectDraft";
 
-export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen: controlledSetOpen }: AddProjectDialogProps) {
-  const [internalOpen, setInternalOpen] = useState(false);
+export function AddProjectDialog({ onProjectAdded, open, setOpen }: AddProjectDialogProps) {
   const [loading, setLoading] = useState(false);
   const [lookups, setLookups] = useState({ clients: [], categories: [], departments: [] });
   const [isNewClient, setIsNewClient] = useState(false);
@@ -42,10 +43,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   const [pgEnabled, setPgEnabled] = useState(false);
   const [pgInputType, setPgInputType] = useState<'percentage' | 'amount'>('percentage');
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
-
-  // Use controlled state if provided, otherwise fallback to local state
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = controlledSetOpen !== undefined ? controlledSetOpen : setInternalOpen;
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
 
   // Get current date in YYYY-MM-DD format for default value
   const getCurrentDate = () => {
@@ -527,6 +525,27 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error();
+
+      const createdProject = await res.json();
+
+      // Step 2: Upload pending files if any
+      const validFiles = pendingFiles.filter(f => !f.error);
+      if (validFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          const titles: string[] = [];
+          for (const entry of validFiles) {
+            formData.append("files", entry.file);
+            titles.push(entry.title || entry.file.name.replace(/\.pdf$/i, ""));
+          }
+          formData.append("titles", JSON.stringify(titles));
+
+          await apiUpload(`/api/projects/${createdProject.id}/files`, formData);
+        } catch {
+          toast.warning("Project created but file upload failed. You can upload files from the project detail page.");
+        }
+      }
+
       toast.success("Project Authorized: Billing milestones initialized.");
 
       // Clear draft after successful submission
@@ -557,6 +576,7 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
       setPgEnabled(false);
       setPgInputType('percentage');
       setAmountErrors({});
+      setPendingFiles([]);
       onProjectAdded();
     } catch (err) {
       toast.error("Process Failed: Please verify all required fields.");
@@ -684,11 +704,6 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
   return (
     <>
       <Dialog open={open} onOpenChange={handleDialogClose}>
-        <DialogTrigger asChild>
-          <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all">
-            <Plus className="w-4 h-4" /> Create New Project
-          </Button>
-        </DialogTrigger>
         <DialogContent
           className="max-w-5xl max-h-[95vh] overflow-y-auto"
           // onInteractOutside={(e) => {
@@ -1136,6 +1151,14 @@ export function AddProjectDialog({ onProjectAdded, open: controlledOpen, setOpen
                 )}
               </div>
             )}
+          </div>
+
+          {/* Document Attachments Section */}
+          <div className="space-y-4 border-t pt-6">
+            <Label className="text-xl font-black uppercase tracking-tight">
+              Document Attachments
+            </Label>
+            <FileUploadZone files={pendingFiles} onChange={setPendingFiles} />
           </div>
 
           <div className="flex gap-3">

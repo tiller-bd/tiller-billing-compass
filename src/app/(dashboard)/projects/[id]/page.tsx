@@ -18,6 +18,7 @@ import { RecordPaymentDialog } from '@/components/billing/RecordPaymentDialog';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { EditBillDialog } from '@/components/billing/EditBillDialog';
 import { ChangeStatusDialog } from '@/components/projects/ChangeStatusDialog';
+import { ProjectFilesDialog } from '@/components/projects/ProjectFilesDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -209,6 +210,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                 .then(data => setProject(data));
             }}
           />
+          <ProjectFilesDialog projectId={project.id} />
           <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-2 md:px-3 py-1 font-bold text-xs">
             {project.category?.name}
           </Badge>

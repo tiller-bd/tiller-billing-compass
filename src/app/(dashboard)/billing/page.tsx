@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RefreshCw, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
+import { RefreshCw, Wallet, TrendingUp, TrendingDown, Plus } from 'lucide-react';
 import { BillingTable, BillingTableSkeleton } from '@/components/billing/BillingTable';
 import { AddBillDialog } from '@/components/billing/AddBillDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -63,10 +63,11 @@ export default function BillingMasterPage() {
     return yearType === 'fiscal' ? `fy-${year}` : `cal-${year}`;
   };
 
-  // Detect ?new=true from Sidebar
+  // Detect ?new=true from Sidebar, then clear the param
   useEffect(() => {
     if (searchParams.get('new') === 'true') {
       setIsAddBillOpen(true);
+      window.history.replaceState(null, '', '/billing');
     }
   }, [searchParams]);
 
@@ -186,6 +187,9 @@ export default function BillingMasterPage() {
           <div className="flex gap-2 shrink-0">
             <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full h-9 w-9">
               <RefreshCw className={cn(loading && "animate-spin")} size={16} />
+            </Button>
+            <Button variant="default" size="sm" className="h-9 gap-2 font-bold uppercase tracking-tight shadow-md" onClick={() => setIsAddBillOpen(true)}>
+              <Plus size={16} /> New Bill Entry
             </Button>
             <AddBillDialog
               open={isAddBillOpen}

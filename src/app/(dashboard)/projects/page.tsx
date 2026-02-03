@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RefreshCw, BarChart3, TrendingUp, Wallet, TrendingDown, FolderKanban, Shield } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, Wallet, TrendingDown, FolderKanban, Shield, Plus } from 'lucide-react';
 import { ProjectTable, ProjectTableSkeleton } from '@/components/projects/ProjectTable';
 import { AddProjectDialog } from '@/components/projects/AddProjectDialog';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -63,10 +63,11 @@ export default function ProjectsPage() {
     return yearType === 'fiscal' ? `fy-${yearFilter}` : `cal-${yearFilter}`;
   };
 
-  // Trigger dialog if URL contains ?new=true
+  // Trigger dialog if URL contains ?new=true, then clear the param
   useEffect(() => {
     if (searchParams.get('new') === 'true') {
       setIsAddProjectOpen(true);
+      window.history.replaceState(null, '', '/projects');
     }
   }, [searchParams]);
 
@@ -236,6 +237,9 @@ export default function ProjectsPage() {
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading} className="h-9 w-9">
               <RefreshCw className={loading ? "animate-spin" : ""} size={16} />
+            </Button>
+            <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all" onClick={() => setIsAddProjectOpen(true)}>
+              <Plus className="w-4 h-4" /> Create New Project
             </Button>
             <AddProjectDialog
               open={isAddProjectOpen}

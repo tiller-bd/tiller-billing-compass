@@ -30,9 +30,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem('auth_user');
     if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
+      // Check if the auth_session cookie still exists.
+      // If the cookie expired server-side but localStorage persists,
+      // the stale data causes a redirect loop on /login (white screen).
+      const hasSessionCookie = document.cookie.split(';').some(c => c.trim().startsWith('auth_session='));
+      if (hasSessionCookie) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          localStorage.removeItem('auth_user');
+        }
+      } else {
+        // Cookie gone (expired) — clear stale localStorage
         localStorage.removeItem('auth_user');
       }
     }

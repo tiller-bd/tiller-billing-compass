@@ -40,6 +40,9 @@ Thumbs.db
 *.sln
 *.sw?
 
+# Uploaded files
+uploads/
+
 # Claude
 .claude/
 

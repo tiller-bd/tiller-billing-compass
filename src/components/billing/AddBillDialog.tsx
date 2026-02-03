@@ -2,26 +2,22 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Banknote, Plus, CheckCircle2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Banknote, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentForm } from "./PaymentForm";
 import { cn } from "@/lib/utils";
 
-export function AddBillDialog({ onBillAdded, open: controlledOpen, setOpen: controlledSetOpen }: {
+export function AddBillDialog({ onBillAdded, open, setOpen }: {
   onBillAdded: () => void,
-  open?: boolean,
-  setOpen?: (v: boolean) => void
+  open: boolean,
+  setOpen: (v: boolean) => void
 }) {
-  const [internalOpen, setInternalOpen] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedBillId, setSelectedBillId] = useState<string>("");
-
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = controlledSetOpen !== undefined ? controlledSetOpen : setInternalOpen;
 
   useEffect(() => {
     if (open) {
@@ -58,11 +54,6 @@ export function AddBillDialog({ onBillAdded, open: controlledOpen, setOpen: cont
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="default" size="sm" className="h-9 gap-2 font-bold uppercase tracking-tight shadow-md">
-          <Plus size={16} /> New Bill Entry
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-black uppercase flex items-center gap-2">
