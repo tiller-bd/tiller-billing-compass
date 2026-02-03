@@ -26,27 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Hydrate user from localStorage after mount to prevent SSR mismatch
   useEffect(() => {
-    const stored = localStorage.getItem('auth_user');
-    if (stored) {
-      // Check if the auth_session cookie still exists.
-      // If the cookie expired server-side but localStorage persists,
-      // the stale data causes a redirect loop on /login (white screen).
-      const hasSessionCookie = document.cookie.split(';').some(c => c.trim().startsWith('auth_session='));
-      if (hasSessionCookie) {
-        try {
-          setUser(JSON.parse(stored));
-        } catch {
-          localStorage.removeItem('auth_user');
-        }
-      } else {
-        // Cookie gone (expired) — clear stale localStorage
-        localStorage.removeItem('auth_user');
-      }
+  const stored = localStorage.getItem('auth_user');
+  if (stored) {
+    try {
+      // Remove the document.cookie check here because HttpOnly cookies 
+      // are invisible to client-side JS and will always return false.
+      setUser(JSON.parse(stored));
+    } catch {
+      localStorage.removeItem('auth_user');
     }
-    setIsHydrated(true);
-  }, []);
+  }
+  setIsHydrated(true);
+}, []);
 
   const handleActivity = useCallback(() => {
     if (!isLocked) setLastActivity(Date.now());
