@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
-import { saveFile, deleteFile } from "@/lib/file-storage";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
@@ -17,9 +16,19 @@ export async function GET(
     const { id } = await params;
     const projectId = parseInt(id);
 
+    // Exclude fileData from listing to keep responses small
     const files = await prisma.projectFile.findMany({
       where: { projectId },
       orderBy: { uploadedAt: "desc" },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        uploadedAt: true,
+      },
     });
 
     return NextResponse.json(files);
@@ -42,7 +51,6 @@ export async function POST(
     const { id } = await params;
     const projectId = parseInt(id);
 
-    // Verify project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -101,46 +109,34 @@ export async function POST(
       );
     }
 
-    // Save files to disk and create DB records
-    const savedPaths: string[] = [];
+    // Store files directly in the database
     const createdFiles = [];
 
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const { relativePath, fileName } = await saveFile(
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const title = titles[i] || file.name.replace(/\.pdf$/i, "");
+
+      const record = await prisma.projectFile.create({
+        data: {
           projectId,
-          buffer,
-          file.name
-        );
-        savedPaths.push(relativePath);
-
-        const title =
-          titles[i] || file.name.replace(/\.pdf$/i, "");
-
-        const record = await prisma.projectFile.create({
-          data: {
-            projectId,
-            title,
-            fileName: file.name,
-            filePath: relativePath,
-            fileSize: file.size,
-            mimeType: file.type,
-          },
-        });
-        createdFiles.push(record);
-      }
-    } catch (error) {
-      // Clean up already-written files on failure
-      for (const p of savedPaths) {
-        try {
-          await deleteFile(p);
-        } catch {
-          // ignore cleanup errors
-        }
-      }
-      throw error;
+          title,
+          fileName: file.name,
+          fileData: buffer,
+          fileSize: file.size,
+          mimeType: file.type,
+        },
+        select: {
+          id: true,
+          projectId: true,
+          title: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          uploadedAt: true,
+        },
+      });
+      createdFiles.push(record);
     }
 
     return NextResponse.json(createdFiles, { status: 201 });

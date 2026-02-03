@@ -102,7 +102,7 @@ model ProjectFile {
   projectId  Int      @map("project_id")
   title      String   @db.VarChar(255)
   fileName   String   @map("file_name") @db.VarChar(255)
-  filePath   String   @map("file_path") @db.VarChar(500)
+  fileData   Bytes    @map("file_data")
   fileSize   Int      @map("file_size")
   mimeType   String   @map("mime_type") @db.VarChar(100)
   uploadedAt DateTime @default(now()) @map("uploaded_at")

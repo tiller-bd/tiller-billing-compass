@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
-import { deleteFile } from "@/lib/file-storage";
 
 export async function PATCH(
   request: NextRequest,
@@ -16,6 +15,7 @@ export async function PATCH(
 
     const file = await prisma.projectFile.findFirst({
       where: { id: parseInt(fileId), projectId: parseInt(id) },
+      select: { id: true },
     });
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
@@ -24,6 +24,15 @@ export async function PATCH(
     const updated = await prisma.projectFile.update({
       where: { id: file.id },
       data: { title: body.title },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        uploadedAt: true,
+      },
     });
 
     return NextResponse.json(updated);
@@ -47,16 +56,10 @@ export async function DELETE(
 
     const file = await prisma.projectFile.findFirst({
       where: { id: parseInt(fileId), projectId: parseInt(id) },
+      select: { id: true },
     });
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
-    }
-
-    // Delete from disk first, then DB
-    try {
-      await deleteFile(file.filePath);
-    } catch (err) {
-      console.warn("Could not delete file from disk:", file.filePath, err);
     }
 
     await prisma.projectFile.delete({ where: { id: file.id } });

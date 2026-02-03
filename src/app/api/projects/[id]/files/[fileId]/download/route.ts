@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
-import { getAbsolutePath } from "@/lib/file-storage";
-import { promises as fs } from "fs";
 
 export async function GET(
   request: NextRequest,
@@ -16,21 +14,15 @@ export async function GET(
 
     const file = await prisma.projectFile.findFirst({
       where: { id: parseInt(fileId), projectId: parseInt(id) },
+      select: {
+        fileName: true,
+        fileData: true,
+        fileSize: true,
+        mimeType: true,
+      },
     });
-    if (!file) {
+    if (!file || !file.fileData) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
-    }
-
-    const absolutePath = getAbsolutePath(file.filePath);
-
-    let fileBuffer: Buffer;
-    try {
-      fileBuffer = await fs.readFile(absolutePath);
-    } catch {
-      return NextResponse.json(
-        { error: "File not found on disk" },
-        { status: 404 }
-      );
     }
 
     const isDownload =
@@ -39,11 +31,11 @@ export async function GET(
       ? `attachment; filename="${file.fileName}"`
       : `inline; filename="${file.fileName}"`;
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(file.fileData, {
       headers: {
-        "Content-Type": "application/pdf",
+        "Content-Type": file.mimeType,
         "Content-Disposition": disposition,
-        "Content-Length": String(fileBuffer.length),
+        "Content-Length": String(file.fileSize),
       },
     });
   } catch (error) {
