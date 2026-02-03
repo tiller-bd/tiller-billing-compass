@@ -91,21 +91,21 @@ export function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-sidebar-border space-y-2">
-        {!collapsed && (
+        {/* {!collapsed && (
           <div className="flex flex-col gap-2 mb-4">
             <Link href="/projects?new=true">
               <Button size="sm" className="w-full justify-start gap-2">
                 <PlusCircle className="w-4 h-4" /> Add Project
               </Button>
             </Link>
-            {/* Points to Billing with ?new=true to open AddBillDialog */}
+           
             <Link href="/billing?new=true">
               <Button size="sm" variant="outline" className="w-full justify-start gap-2">
                 <Receipt className="w-4 h-4" /> Add Bill
               </Button>
             </Link>
           </div>
-        )}
+        )} */}
         <div className={cn("flex gap-2", collapsed ? "flex-col" : "flex-row")}>
           <Button
             onClick={lock}

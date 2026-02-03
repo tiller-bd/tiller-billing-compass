@@ -43,7 +43,7 @@ export function MobileNav() {
       )}
 
       {/* Quick Actions Menu */}
-      {showQuickActions && (
+      {/* {showQuickActions && (
         <motion.div
           initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
@@ -65,7 +65,7 @@ export function MobileNav() {
             </Link>
           </div>
         </motion.div>
-      )}
+      )} */}
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t border-border safe-area-bottom">
@@ -97,7 +97,7 @@ export function MobileNav() {
           })}
 
           {/* Center FAB Button */}
-          <div className="flex-1 flex justify-center -mt-6">
+          {/* <div className="flex-1 flex justify-center -mt-6">
             <motion.button
               onClick={() => setShowQuickActions(!showQuickActions)}
               className={cn(
@@ -111,7 +111,7 @@ export function MobileNav() {
             >
               {showQuickActions ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
             </motion.button>
-          </div>
+          </div> */}
 
           {navItems.slice(2, 4).map((item) => {
             const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
