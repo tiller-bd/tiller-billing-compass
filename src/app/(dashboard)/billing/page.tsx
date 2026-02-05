@@ -3,9 +3,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RefreshCw, Wallet, TrendingUp, TrendingDown, Plus } from 'lucide-react';
+import { RefreshCw, Plus } from 'lucide-react';
 import { BillingTable, BillingTableSkeleton } from '@/components/billing/BillingTable';
 import { AddBillDialog } from '@/components/billing/AddBillDialog';
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,7 +14,6 @@ import { ErrorDisplay } from '@/components/error/ErrorDisplay';
 import { ApiClientError, apiFetch } from '@/lib/api-client';
 import { useSharedFilters } from '@/contexts/FilterContext';
 import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
-import { MetricCard } from '@/components/dashboard/MetricCard';
 
 export default function BillingMasterPage() {
   const router = useRouter();
@@ -25,6 +25,7 @@ export default function BillingMasterPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiClientError | null>(null);
+  const [metricsRefreshTrigger, setMetricsRefreshTrigger] = useState(0);
 
   // Local state to control the creation dialog
   const [isAddBillOpen, setIsAddBillOpen] = useState(false);
@@ -132,45 +133,6 @@ export default function BillingMasterPage() {
     return () => clearTimeout(timer);
   }, [fetchBills]);
 
-  // Calculate metrics from filtered bills
-  const metrics = useMemo(() => {
-    // Total Budget = sum of ALL bills' billAmount
-    const totalBudget = bills.reduce(
-      (sum: number, b: any) => sum + Number(b.billAmount || 0),
-      0
-    );
-
-    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
-    const totalReceived = bills
-      .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
-      .reduce((sum: number, b: any) => sum + Number(b.receivedAmount || 0), 0);
-
-    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
-    const totalRemaining = bills.reduce((sum: number, b: any) => {
-      if (b.status === 'PENDING') {
-        return sum + Number(b.billAmount || 0);
-      } else if (b.status === 'PARTIAL') {
-        const billAmount = Number(b.billAmount || 0);
-        const receivedAmount = Number(b.receivedAmount || 0);
-        return sum + (billAmount - receivedAmount);
-      }
-      return sum;
-    }, 0);
-
-    // Collection percentage
-    const collectionPercent = totalBudget > 0
-      ? Math.round((totalReceived / totalBudget) * 100)
-      : 0;
-
-    return {
-      totalBudget,
-      totalReceived,
-      totalRemaining,
-      collectionPercent,
-      billCount: bills.length,
-    };
-  }, [bills]);
-
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(amount));
     return `৳${formatted}`;
@@ -185,7 +147,7 @@ export default function BillingMasterPage() {
           </div>
           {/* New Button Layout: Refresh + New Bill Entry */}
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="icon" onClick={fetchBills} className="rounded-full h-9 w-9">
+            <Button variant="outline" size="icon" onClick={() => { fetchBills(); setMetricsRefreshTrigger(t => t + 1); }} className="rounded-full h-9 w-9">
               <RefreshCw className={cn(loading && "animate-spin")} size={16} />
             </Button>
             <Button variant="default" size="sm" className="h-9 gap-2 font-bold uppercase tracking-tight shadow-md" onClick={() => setIsAddBillOpen(true)}>
@@ -200,37 +162,14 @@ export default function BillingMasterPage() {
         </div>
 
         {/* Summary Metrics */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <MetricCard
-            loading={loading}
-            title="Total Budget"
-            value={formatCurrency(metrics.totalBudget)}
-            icon={Wallet}
-            variant="primary"
-          />
-          <MetricCard
-            loading={loading}
-            title="Total Received"
-            value={formatCurrency(metrics.totalReceived)}
-            description={`${metrics.collectionPercent}% collected`}
-            icon={TrendingUp}
-            variant="success"
-          />
-          <MetricCard
-            loading={loading}
-            title="Total Pending"
-            value={formatCurrency(metrics.totalRemaining)}
-            description={`${100 - metrics.collectionPercent}% remaining`}
-            icon={TrendingDown}
-            variant="warning"
-          />
-          <MetricCard
-            loading={loading}
-            title="Total Bills"
-            value={metrics.billCount.toString()}
-            icon={Wallet}
-          />
-        </div>
+        <DashboardMetrics
+          departmentId={dept}
+          status={status}
+          yearParam={getYearParam()}
+          variant="billing"
+          billCount={bills.length}
+          refreshTrigger={metricsRefreshTrigger}
+        />
 
         {/* Filter Bar - Scrollable on mobile */}
         <div className="glass-card rounded-2xl border-border/50 shadow-sm p-3 md:p-4 overflow-x-auto">

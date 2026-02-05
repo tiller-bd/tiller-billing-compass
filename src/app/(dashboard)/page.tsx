@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Wallet, TrendingUp, TrendingDown, FolderKanban, Maximize2, RefreshCw, X, Shield } from 'lucide-react';
+import { Maximize2, RefreshCw, X, Shield } from 'lucide-react';
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
 import { MetricCard } from '@/components/dashboard/MetricCard';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ProjectDistributionChart } from '@/components/dashboard/ProjectDistributionChart';
 import { BudgetComparisonChart } from '@/components/dashboard/BudgetComparisonChart';
@@ -17,7 +19,8 @@ import { DashboardFilter } from '@/components/dashboard/DashboardFilter';
 import { ApiClientError, apiFetch } from '@/lib/api-client';
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metricsData, setMetricsData] = useState<any>(null);
+  const [metricsRefreshTrigger, setMetricsRefreshTrigger] = useState(0);
   const [revenue, setRevenue] = useState([]);
   const [revenueYearly, setRevenueYearly] = useState([]);
   const [distribution, setDistribution] = useState([]);
@@ -38,7 +41,6 @@ export default function DashboardPage() {
 
   // Individual Loading States for Refetching
   const [loadingStates, setLoadingStates] = useState({
-    metrics: true,
     revenue: true,
     revenueYearly: true,
     distribution: true,
@@ -51,7 +53,6 @@ export default function DashboardPage() {
 
   // Error states for each section
   const [errors, setErrors] = useState<{
-    metrics: ApiClientError | null;
     revenue: ApiClientError | null;
     revenueYearly: ApiClientError | null;
     distribution: ApiClientError | null;
@@ -61,7 +62,6 @@ export default function DashboardPage() {
     calendar: ApiClientError | null;
     projects: ApiClientError | null;
   }>({
-    metrics: null,
     revenue: null,
     revenueYearly: null,
     distribution: null,
@@ -89,22 +89,6 @@ export default function DashboardPage() {
   };
 
   // Specialized Fetchers with error handling
-  const fetchMetrics = useCallback(async () => {
-    updateLoading('metrics', true);
-    updateError('metrics', null);
-    try {
-      const params = getFilterQueryParams();
-      const data = await apiFetch(`/api/dashboard/metrics?year=${yearParam}&${params}`);
-      setMetrics(data);
-    } catch (err) {
-      if (err instanceof ApiClientError) {
-        updateError('metrics', err);
-      }
-    } finally {
-      updateLoading('metrics', false);
-    }
-  }, [departmentId, clientId, status, yearParam]);
-
   const fetchRevenue = useCallback(async () => {
     updateLoading('revenue', true);
     updateError('revenue', null);
@@ -235,7 +219,6 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    fetchMetrics();
     fetchRevenue();
     fetchRevenueYearly();
     fetchDistribution();
@@ -244,7 +227,7 @@ export default function DashboardPage() {
     fetchDeadlines();
     fetchCalendar();
     fetchProjects();
-  }, [yearParam, departmentId, clientId, status, fetchMetrics, fetchRevenue, fetchRevenueYearly, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
+  }, [yearParam, departmentId, clientId, status, fetchRevenue, fetchRevenueYearly, fetchDistribution, fetchBudgetComparison, fetchLastReceived, fetchDeadlines, fetchCalendar, fetchProjects]);
 
   const formatCurrency = (amount: number) => {
     // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
@@ -273,36 +256,19 @@ export default function DashboardPage() {
 
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-page-content">
         <DashboardFilter />
-        {/* Top Metric Cards - 2x2 grid on mobile, 4 cols on desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
-            </Button>
-            <MetricCard loading={loadingStates.metrics} title="Total Budget" value={formatCurrency(metrics?.totalBudget || 0)} icon={Wallet} variant="primary" />
-          </div>
-          <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
-            </Button>
-            <MetricCard loading={loadingStates.metrics} title="Total Received" value={formatCurrency(metrics?.totalReceived || 0)} icon={TrendingUp} variant="success" />
-          </div>
-          <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
-            </Button>
-            <MetricCard loading={loadingStates.metrics} title="Total Remaining" value={formatCurrency(metrics?.totalRemaining || 0)} icon={TrendingDown} variant="warning" />
-          </div>
-          <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
-              <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
-            </Button>
-            <MetricCard loading={loadingStates.metrics} title="Active Projects" value={metrics?.activeCount?.toString() || "0"} icon={FolderKanban} />
-          </div>
-        </div>
+        {/* Top Metric Cards */}
+        <DashboardMetrics
+          departmentId={departmentId}
+          clientId={clientId}
+          status={status}
+          yearParam={yearParam}
+          variant="dashboard"
+          refreshTrigger={metricsRefreshTrigger}
+          onMetricsLoaded={setMetricsData}
+        />
 
         {/* Project Guarantee (PG) Metrics - Conditional Display */}
-        {metrics && (metrics.pgDeposited > 0 || metrics.pgCleared > 0 || metrics.pgPending > 0) && (
+        {metricsData && (metricsData.pgDeposited > 0 || metricsData.pgCleared > 0 || metricsData.pgPending > 0) && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-1">
               <Shield className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
@@ -312,37 +278,34 @@ export default function DashboardPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={() => setMetricsRefreshTrigger(t => t + 1)}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loadingStates.metrics}
                   title="PG Deposited"
-                  value={formatCurrency(metrics?.pgDeposited || 0)}
+                  value={formatCurrency(metricsData?.pgDeposited || 0)}
                   icon={Shield}
                   variant="default"
                 />
               </div>
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={() => setMetricsRefreshTrigger(t => t + 1)}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loadingStates.metrics}
                   title="PG Cleared"
-                  value={formatCurrency(metrics?.pgCleared || 0)}
+                  value={formatCurrency(metricsData?.pgCleared || 0)}
                   icon={TrendingUp}
                   variant="success"
                 />
               </div>
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={() => setMetricsRefreshTrigger(t => t + 1)}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loadingStates.metrics}
                   title="PG Pending"
-                  value={formatCurrency(metrics?.pgPending || 0)}
+                  value={formatCurrency(metricsData?.pgPending || 0)}
                   icon={TrendingDown}
                   variant="warning"
                 />
