@@ -612,6 +612,7 @@ Returns filtered projects for dashboard table.
 
 **SQL Equivalent:**
 ```sql
+-- Main query: Projects with client, category, and bills
 SELECT
   p.*,
   c.id as client_id, c.name as client_name,
@@ -621,13 +622,18 @@ JOIN clients c ON p.client_id = c.id
 JOIN project_categories pc ON p.category_id = pc.id
 WHERE (p.project_name ILIKE '%search%' OR c.name ILIKE '%search%')
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
+  AND (p.client_id = :clientId OR :clientId IS NULL)
 ORDER BY p.start_date DESC;
 
--- With bills filtered by year
+-- Bills for each project (filtered by year if provided)
 SELECT pb.*
 FROM project_bills pb
-WHERE pb.project_id = :projectId
-  AND pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30';
+WHERE pb.project_id IN (SELECT id FROM projects_result)
+  AND (pb.tentative_billing_date BETWEEN :yearStart AND :yearEnd OR :year = 'all');
+
+-- Note: In application, bills are nested in each project object.
+-- Projects with no bills in the year range are excluded when year filter is applied.
+-- Effective status filter is applied after fetching based on computed bill statuses.
 ```
 
 ---
@@ -677,9 +683,12 @@ Returns all projects with optional filtering.
 
 **SQL Equivalent:**
 ```sql
+-- Main query: Projects with related data
 SELECT
   p.*,
-  c.*, d.*, pc.*
+  c.id as client_id, c.name as client_name, c.contact_person, c.contact_email, c.contact_phone,
+  d.id as department_id, d.name as department_name,
+  pc.id as category_id, pc.name as category_name
 FROM projects p
 JOIN clients c ON p.client_id = c.id
 JOIN departments d ON p.department_id = d.id
@@ -688,7 +697,18 @@ WHERE (p.project_name ILIKE '%search%' OR c.name ILIKE '%search%')
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
   AND (p.category_id = :categoryId OR :categoryId IS NULL)
   AND (p.client_id = :clientId OR :clientId IS NULL)
+  AND (p.id = :projectId OR :projectId IS NULL)
 ORDER BY p.start_date DESC;
+
+-- Bills for each project (filtered by year if provided)
+SELECT pb.*
+FROM project_bills pb
+WHERE pb.project_id IN (SELECT id FROM projects_result)
+  AND (pb.tentative_billing_date BETWEEN :yearStart AND :yearEnd OR :year = 'all');
+
+-- Note: In application, bills are nested in each project object.
+-- Projects with no bills in the year range are excluded when year filter is applied.
+-- Effective status (ONGOING/COMPLETED) is computed based on bill statuses.
 ```
 
 ---
@@ -901,11 +921,12 @@ Returns all bills with filtering.
 
 **SQL Equivalent:**
 ```sql
+-- Bills with nested project, client, and department data
 SELECT
   pb.*,
-  p.project_name, p.client_id, p.department_id,
-  c.name as client_name,
-  d.name as department_name
+  p.id as project_id, p.project_name, p.client_id, p.department_id,
+  c.id as client_id, c.name as client_name,
+  d.id as department_id, d.name as department_name
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 JOIN clients c ON p.client_id = c.id
@@ -913,11 +934,14 @@ JOIN departments d ON p.department_id = d.id
 WHERE (pb.bill_name ILIKE '%search%'
     OR p.project_name ILIKE '%search%'
     OR c.name ILIKE '%search%')
-  AND (pb.status = :status OR :status IS NULL)
-  AND (p.department_id = :departmentId OR :departmentId IS NULL)
-  AND (p.client_id = :clientId OR :clientId IS NULL)
-  AND (pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30' OR :year IS NULL)
+  AND (pb.status = :status OR :status = 'all')
+  AND (p.department_id = :departmentId OR :departmentId = 'all')
+  AND (p.client_id = :clientId OR :clientId = 'all')
+  AND (p.id = :projectId OR :projectId = 'all')
+  AND (pb.tentative_billing_date BETWEEN :yearStart AND :yearEnd OR :year = 'all')
 ORDER BY pb.tentative_billing_date ASC;
+
+-- Note: In response, project object is nested with client and department objects
 ```
 
 ---
@@ -939,10 +963,30 @@ Creates a new bill for a project.
 }
 ```
 
-**Response:** Created bill object (status 201)
+**Response:** Created bill object with nested project (status 201)
+```json
+{
+  "id": 10,
+  "projectId": 1,
+  "billName": "Final Payment",
+  "billPercent": 20,
+  "billAmount": 100000,
+  "tentativeBillingDate": "2025-03-01",
+  "status": "PENDING",
+  "slNo": "003",
+  "receivedAmount": 0,
+  "project": {
+    "id": 1,
+    "projectName": "Project Alpha",
+    "client": {...},
+    "department": {...}
+  }
+}
+```
 
 **SQL Equivalent:**
 ```sql
+-- Insert bill
 INSERT INTO project_bills (
   project_id, bill_name, bill_percent, bill_amount,
   tentative_billing_date, status, sl_no, received_amount
@@ -950,23 +994,56 @@ INSERT INTO project_bills (
   1, 'Final Payment', 20, 100000,
   '2025-03-01', 'PENDING', '003', 0
 ) RETURNING *;
+
+-- Then fetch with nested project data
+SELECT pb.*, p.*, c.*, d.*
+FROM project_bills pb
+JOIN projects p ON pb.project_id = p.id
+JOIN clients c ON p.client_id = c.id
+JOIN departments d ON p.department_id = d.id
+WHERE pb.id = :new_bill_id;
 ```
 
 ---
 
 ### GET `/api/bills/:id`
 
-Returns a single bill with project details.
+Returns a single bill with project details (including client, department, category).
+
+**Response:**
+```json
+{
+  "id": 1,
+  "projectId": 1,
+  "billName": "First Payment",
+  "billAmount": 150000,
+  "status": "PENDING",
+  "project": {
+    "id": 1,
+    "projectName": "Project Alpha",
+    "client": {...},
+    "department": {...},
+    "category": {...}
+  }
+}
+```
 
 **SQL Equivalent:**
 ```sql
-SELECT pb.*, p.*, c.*, d.*, pc.*
+SELECT
+  pb.*,
+  p.id as project_id, p.project_name,
+  c.id as client_id, c.name as client_name,
+  d.id as department_id, d.name as department_name,
+  pc.id as category_id, pc.name as category_name
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 JOIN clients c ON p.client_id = c.id
 JOIN departments d ON p.department_id = d.id
 JOIN project_categories pc ON p.category_id = pc.id
 WHERE pb.id = :id;
+
+-- Note: In response, project object contains nested client, department, and category objects
 ```
 
 ---
@@ -1066,18 +1143,29 @@ Returns all clients with financial aggregates.
 
 **SQL Equivalent:**
 ```sql
-SELECT
-  c.*,
-  COUNT(DISTINCT p.id) as project_count,
-  SUM(pb.bill_amount) as total_budget,
-  SUM(CASE WHEN pb.status IN ('PAID', 'PARTIAL') THEN pb.received_amount ELSE 0 END) as total_received
+-- Fetch clients with projects and bills (for year filtering)
+SELECT c.*, p.id as project_id, pb.*
 FROM clients c
 LEFT JOIN projects p ON c.id = p.client_id
 LEFT JOIN project_bills pb ON p.id = pb.project_id
 WHERE (c.name ILIKE '%search%' OR c.contact_person ILIKE '%search%')
-  AND (pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30' OR :year IS NULL)
-GROUP BY c.id
+  AND (
+    :year = 'all'
+    OR EXISTS (
+      SELECT 1 FROM projects p2
+      JOIN project_bills pb2 ON p2.id = pb2.project_id
+      WHERE p2.client_id = c.id
+        AND pb2.tentative_billing_date BETWEEN :yearStart AND :yearEnd
+    )
+  )
 ORDER BY c.name ASC;
+
+-- Aggregates computed in application:
+-- projectCount = COUNT of projects with bills in year range
+-- totalBudget = SUM(bill_amount) for bills in year range
+-- totalReceived = SUM(received_amount) for PAID/PARTIAL bills in year range
+-- totalDue = totalBudget - totalReceived
+-- realizationRate = (totalReceived / totalBudget) * 100
 ```
 
 ---
@@ -1134,23 +1222,41 @@ Returns a single client with all projects and rank.
 
 **SQL Equivalent:**
 ```sql
--- Get client with projects
-SELECT c.*, p.*, d.*, pc.*, pb.*
+-- Get client with nested projects, departments, categories, and bills
+SELECT c.*
 FROM clients c
-LEFT JOIN projects p ON c.id = p.client_id
-LEFT JOIN departments d ON p.department_id = d.id
-LEFT JOIN project_categories pc ON p.category_id = pc.id
-LEFT JOIN project_bills pb ON p.id = pb.project_id
-WHERE c.id = :id
-ORDER BY p.start_date DESC, pb.tentative_billing_date ASC;
+WHERE c.id = :id;
 
--- Calculate rank
+-- Get projects for this client with related data
+SELECT
+  p.*,
+  d.id as department_id, d.name as department_name,
+  pc.id as category_id, pc.name as category_name
+FROM projects p
+JOIN departments d ON p.department_id = d.id
+JOIN project_categories pc ON p.category_id = pc.id
+WHERE p.client_id = :id
+ORDER BY p.start_date DESC;
+
+-- Get bills for each project
+SELECT pb.*
+FROM project_bills pb
+WHERE pb.project_id IN (SELECT id FROM projects WHERE client_id = :id)
+ORDER BY pb.tentative_billing_date ASC;
+
+-- Calculate rank among all clients by total project value
+WITH client_totals AS (
+  SELECT client_id, SUM(total_project_value) as total_value
+  FROM projects
+  GROUP BY client_id
+)
 SELECT
   client_id,
-  SUM(total_project_value) as total_value,
-  RANK() OVER (ORDER BY SUM(total_project_value) DESC) as rank
-FROM projects
-GROUP BY client_id;
+  total_value,
+  ROW_NUMBER() OVER (ORDER BY total_value DESC) as rank
+FROM client_totals;
+
+-- Note: In response, projects are nested with their bills, and rank is added to client object
 ```
 
 ---
