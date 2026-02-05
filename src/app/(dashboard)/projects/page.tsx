@@ -24,7 +24,9 @@ export default function ProjectsPage() {
   const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [error, setError] = useState<ApiClientError | null>(null);
+  const [apiMetrics, setApiMetrics] = useState<any>(null);
 
   // Local state to control the dialog visibility
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
@@ -95,6 +97,26 @@ export default function ProjectsPage() {
     }
   }, [debouncedSearch, deptFilter, catFilter, statusFilter, yearType, yearFilter]);
 
+  // Fetch metrics from dashboard API (uses correct date filtering logic)
+  const fetchMetrics = useCallback(async () => {
+    setMetricsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (deptFilter !== 'all') params.append('departmentId', deptFilter);
+      if (catFilter !== 'all') params.append('categoryId', catFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      const yearParam = getYearParam();
+      params.append('year', yearParam);
+
+      const data = await apiFetch(`/api/dashboard/metrics?${params.toString()}`);
+      setApiMetrics(data);
+    } catch (err) {
+      console.error("Metrics fetch error:", err);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [deptFilter, catFilter, statusFilter, yearType, yearFilter]);
+
   // Fetch filter options when year changes
   useEffect(() => {
     async function fetchFilterOptions() {
@@ -129,65 +151,33 @@ export default function ProjectsPage() {
     return () => clearTimeout(timer);
   }, [fetchProjects]);
 
-  // Calculate metrics from filtered projects using bill-based logic
+  // Fetch metrics when filters change
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
+
+  // Check if a specific year is selected (not "all")
+  const isYearSelected = yearType !== 'all' && yearFilter !== 'all';
+
+  // Use API metrics for accurate date-based calculations, with local fallbacks
   const metrics = useMemo(() => {
-    // Get all bills from all projects
-    const allBills = projects.flatMap((p) => p.bills || []);
+    // Use API metrics when available (these use correct receivedDate filtering)
+    const totalBudget = apiMetrics?.totalBudget ?? 0;
+    const totalReceived = apiMetrics?.totalReceived ?? 0;
+    const totalRemaining = apiMetrics?.totalRemaining ?? 0;
+    const activeCount = apiMetrics?.activeCount ?? projects.length;
+    const pgDeposited = apiMetrics?.pgDeposited ?? 0;
+    const pgCleared = apiMetrics?.pgCleared ?? 0;
+    const pgPending = apiMetrics?.pgPending ?? 0;
 
-    // Total Budget = sum of ALL bills' billAmount (regardless of status)
-    const totalBudget = allBills.reduce(
-      (sum, b: any) => sum + Number(b.billAmount || 0),
-      0
-    );
+    // Advanced year-based metrics
+    const receivedFromScheduledYear = apiMetrics?.receivedFromScheduledYear ?? totalReceived;
+    const receivedFromEarlierYears = apiMetrics?.receivedFromEarlierYears ?? 0;
 
-    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
-    const totalReceived = allBills
-      .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
-      .reduce((sum, b: any) => sum + Number(b.receivedAmount || 0), 0);
-
-    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
-    const totalRemaining = allBills.reduce((sum, b: any) => {
-      if (b.status === 'PENDING') {
-        return sum + Number(b.billAmount || 0);
-      } else if (b.status === 'PARTIAL') {
-        const billAmount = Number(b.billAmount || 0);
-        const receivedAmount = Number(b.receivedAmount || 0);
-        return sum + (billAmount - receivedAmount);
-      }
-      return sum;
-    }, 0);
-
-    // Active projects = projects with at least one unpaid bill
-    const activeCount = projects.filter((p) => {
-      const hasUnpaidBills = p.bills?.some((b: any) => b.status !== 'PAID');
-      return hasUnpaidBills;
-    }).length;
-
-    // PG Metrics
-    const pgDeposited = projects.reduce((sum, p) => {
-      if (p.pgStatus === 'PENDING' || p.pgStatus === 'CLEARED') {
-        return sum + Number(p.pgUserDeposit || 0);
-      }
-      return sum;
-    }, 0);
-
-    const pgCleared = projects.reduce((sum, p) => {
-      if (p.pgStatus === 'CLEARED') {
-        return sum + Number(p.pgUserDeposit || 0);
-      }
-      return sum;
-    }, 0);
-
-    const pgPending = projects.reduce((sum, p) => {
-      if (p.pgStatus === 'PENDING') {
-        return sum + Number(p.pgUserDeposit || 0);
-      }
-      return sum;
-    }, 0);
-
-    // Collection percentage
+    // Collection percentage - when year is selected, base on scheduled year received
+    // When "all years", use standard total received / total budget
     const collectionPercent = totalBudget > 0
-      ? Math.round((totalReceived / totalBudget) * 100)
+      ? Math.round((isYearSelected ? receivedFromScheduledYear : totalReceived) / totalBudget * 100)
       : 0;
 
     return {
@@ -199,12 +189,17 @@ export default function ProjectsPage() {
       pgDeposited,
       pgCleared,
       pgPending,
+      receivedFromScheduledYear,
+      receivedFromEarlierYears,
     };
-  }, [projects]);
+  }, [apiMetrics, projects.length, isYearSelected]);
 
   const chartData = useMemo(() => {
     const received = projects.slice(0, 10).map((p: any) => {
-      const rec = p.bills.reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
+      // Only count receivedAmount from PAID and PARTIAL bills
+      const rec = p.bills
+        .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
+        .reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0);
       return {
         name: p.projectName.length > 12 ? p.projectName.substring(0, 10) + '..' : p.projectName,
         received: rec,
@@ -235,8 +230,8 @@ export default function ProjectsPage() {
         <div className="flex justify-between items-center">
           <h1 className="text-lg md:text-2xl font-bold">Project Management</h1>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={fetchProjects} disabled={loading} className="h-9 w-9">
-              <RefreshCw className={loading ? "animate-spin" : ""} size={16} />
+            <Button variant="outline" size="icon" onClick={() => { fetchProjects(); fetchMetrics(); }} disabled={loading || metricsLoading} className="h-9 w-9">
+              <RefreshCw className={loading || metricsLoading ? "animate-spin" : ""} size={16} />
             </Button>
             <Button className="gap-2 font-bold shadow-md hover:shadow-lg transition-all" onClick={() => setIsAddProjectOpen(true)}>
               <Plus className="w-4 h-4" /> Create New Project
@@ -252,28 +247,39 @@ export default function ProjectsPage() {
         {/* Summary Metrics - Similar to Dashboard */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Total Budget" value={formatCurrency(metrics.totalBudget)} icon={Wallet} variant="primary" />
+            <MetricCard loading={metricsLoading} title="Total Budget" value={formatCurrency(metrics.totalBudget)} icon={Wallet} variant="primary" />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Total Received" value={formatCurrency(metrics.totalReceived)} description={`${metrics.collectionPercent}% collected`} icon={TrendingUp} variant="success" />
+            <MetricCard
+              loading={metricsLoading}
+              title="Total Received"
+              value={formatCurrency(metrics.totalReceived)}
+              description={
+                isYearSelected && metrics.receivedFromEarlierYears > 0
+                  ? `${metrics.collectionPercent}% of year | +${formatCurrency(metrics.receivedFromEarlierYears)} earlier dues`
+                  : `${metrics.collectionPercent}% collected`
+              }
+              icon={TrendingUp}
+              variant="success"
+            />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Total Pending" value={formatCurrency(metrics.totalRemaining)} description={`${100 - metrics.collectionPercent}% remaining`} icon={TrendingDown} variant="warning" />
+            <MetricCard loading={metricsLoading} title="Total Pending" value={formatCurrency(metrics.totalRemaining)} description={`${100 - metrics.collectionPercent}% remaining`} icon={TrendingDown} variant="warning" />
           </div>
           <div className="relative group">
-            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+            <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
               <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
             </Button>
-            <MetricCard loading={loading} title="Active Projects" value={metrics.activeCount.toString()} description={`${projects.length} total`} icon={FolderKanban} />
+            <MetricCard loading={metricsLoading} title="Active Projects" value={metrics.activeCount.toString()} description={`${projects.length} total`} icon={FolderKanban} />
           </div>
         </div>
 
@@ -288,11 +294,11 @@ export default function ProjectsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loading}
+                  loading={metricsLoading}
                   title="PG Deposited"
                   value={formatCurrency(metrics.pgDeposited)}
                   icon={Shield}
@@ -300,11 +306,11 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loading}
+                  loading={metricsLoading}
                   title="PG Cleared"
                   value={formatCurrency(metrics.pgCleared)}
                   icon={TrendingUp}
@@ -312,11 +318,11 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="relative group">
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchProjects}>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 md:top-2 md:right-2 z-10 opacity-0 group-hover:opacity-100 h-6 w-6 md:h-7 md:w-7" onClick={fetchMetrics}>
                   <RefreshCw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Button>
                 <MetricCard
-                  loading={loading}
+                  loading={metricsLoading}
                   title="PG Pending"
                   value={formatCurrency(metrics.pgPending)}
                   icon={TrendingDown}
@@ -404,6 +410,11 @@ export default function ProjectsPage() {
               }))}
               onProjectClick={(project: any) => router.push(`/projects/${project.id}`)}
               onRefresh={fetchProjects}
+              yearFilter={
+                yearType !== 'all' && yearFilter !== 'all'
+                  ? { type: yearType as 'fiscal' | 'calendar', year: yearFilter }
+                  : { type: 'all', year: 'all' }
+              }
             />
 
             {/* Charts - Hidden on mobile for performance, shown on tablet+ */}

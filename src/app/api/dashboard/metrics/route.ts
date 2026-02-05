@@ -86,6 +86,24 @@ export async function GET(request: NextRequest) {
       .filter((b) => b.status === "PAID" || b.status === "PARTIAL")
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
 
+    // Advanced year-based metrics (only meaningful when a specific year is selected)
+    let receivedFromScheduledYear = totalReceived;
+    let receivedFromEarlierYears = 0;
+
+    if (dateRange) {
+      // Bills received in the selected year that were also scheduled (tentative) in that year
+      const receivedAndScheduledInYear = receivedBills.filter((b) => {
+        if (b.status !== "PAID" && b.status !== "PARTIAL") return false;
+        return isBillScheduledInDateRange(b);
+      });
+      receivedFromScheduledYear = receivedAndScheduledInYear.reduce(
+        (sum, b) => sum + Number(b.receivedAmount || 0), 0
+      );
+
+      // Bills received in the selected year but scheduled in earlier years
+      receivedFromEarlierYears = totalReceived - receivedFromScheduledYear;
+    }
+
     // Total Remaining = scheduled bills that are PENDING or PARTIAL (remaining portion)
     const totalRemaining = scheduledBills.reduce((sum, b) => {
       if (b.status === "PENDING") {
@@ -121,6 +139,9 @@ export async function GET(request: NextRequest) {
       pgDeposited,
       pgCleared,
       pgPending,
+      // Advanced year-based metrics
+      receivedFromScheduledYear,
+      receivedFromEarlierYears,
     });
   } catch (error) {
     console.error("Dashboard metrics error:", error);

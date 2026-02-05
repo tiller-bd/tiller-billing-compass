@@ -32,6 +32,7 @@ interface ProjectTableProps {
   projects: any[];
   onProjectClick?: (project: any) => void;
   onRefresh?: () => void;
+  yearFilter?: { type: 'fiscal' | 'calendar' | 'all'; year: string };
 }
 
 // --- Exported Skeleton Component ---
@@ -68,8 +69,26 @@ export function ProjectTableSkeleton() {
   );
 }
 
+// Helper to get date range for year filter
+function getYearDateRange(year: string, isFiscal: boolean): { start: Date; end: Date } {
+  const yearNum = parseInt(year);
+  if (isFiscal) {
+    // Fiscal year: July 1 of year to June 30 of next year
+    return {
+      start: new Date(yearNum, 6, 1), // July 1
+      end: new Date(yearNum + 1, 5, 30, 23, 59, 59, 999), // June 30 next year
+    };
+  } else {
+    // Calendar year: Jan 1 to Dec 31
+    return {
+      start: new Date(yearNum, 0, 1),
+      end: new Date(yearNum, 11, 31, 23, 59, 59, 999),
+    };
+  }
+}
+
 // --- Main Table Component ---
-export function ProjectTable({ projects, onProjectClick, onRefresh }: ProjectTableProps) {
+export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }: ProjectTableProps) {
   const [visibleColumns, setVisibleColumns] = useState({
     client: true,
     date: true,
@@ -78,22 +97,61 @@ export function ProjectTable({ projects, onProjectClick, onRefresh }: ProjectTab
   });
   const [updatingProjectId, setUpdatingProjectId] = useState<number | null>(null);
 
+  // Check if a specific year is selected
+  const isYearSelected = yearFilter && yearFilter.type !== 'all' && yearFilter.year !== 'all';
+
   // Prepare data with computed fields for sorting
   const projectsWithComputed = useMemo(() => {
+    // Get date range for year filter if applicable
+    let dateRange: { start: Date; end: Date } | null = null;
+    if (isYearSelected && yearFilter) {
+      dateRange = getYearDateRange(yearFilter.year, yearFilter.type === 'fiscal');
+    }
+
+    // Helper to check if a bill's tentative date falls in the selected year
+    const isBillInYear = (bill: any): boolean => {
+      if (!dateRange) return true;
+      const tentativeDate = bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate) : null;
+      if (!tentativeDate) return false;
+      return tentativeDate >= dateRange.start && tentativeDate <= dateRange.end;
+    };
+
     return projects.map((p: any) => {
-      const total = Number(p.totalProjectValue || 0);
-      const rec = p.bills?.filter((b: any) => b.status === 'PAID')
+      // When year selected: budget = sum of bills with tentative in that year
+      // Otherwise: budget = total project value
+      const bills = p.bills || [];
+
+      let total: number;
+      let yearBills: any[];
+
+      if (isYearSelected && dateRange) {
+        // Filter bills scheduled in the selected year
+        yearBills = bills.filter(isBillInYear);
+        total = yearBills.reduce((s: number, b: any) => s + Number(b.billAmount || 0), 0);
+      } else {
+        yearBills = bills;
+        total = Number(p.totalProjectValue || 0);
+      }
+
+      // REC = receivedAmount from PAID/PARTIAL bills
+      // When year selected: only count received from bills scheduled in that year
+      const rec = yearBills
+        .filter((b: any) => b.status === 'PAID' || b.status === 'PARTIAL')
         .reduce((s: number, b: any) => s + Number(b.receivedAmount || 0), 0) || 0;
+
       const recPct = total > 0 ? Math.round((rec / total) * 100) : 0;
+
       return {
         ...p,
         _totalValue: total,
+        _received: rec,
         _receivedPct: recPct,
         _clientName: p.client?.name || '',
         _startDate: p.startDate ? new Date(p.startDate).getTime() : 0,
+        _isYearFiltered: isYearSelected,
       };
     });
-  }, [projects]);
+  }, [projects, yearFilter, isYearSelected]);
 
   const { sortedData, sortConfig, handleSort } = useSorting(projectsWithComputed);
 
@@ -260,6 +318,7 @@ export function ProjectTable({ projects, onProjectClick, onRefresh }: ProjectTab
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Budget</p>
+                  ss
                   <p className="font-bold">{formatFullCurrency(total)}</p>
                 </div>
                 <div>
