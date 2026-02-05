@@ -17,7 +17,7 @@ const STATUS_OPTIONS: { value: ProjectStatusFilter; label: string; icon: typeof 
   { value: 'all', label: 'All Statuses', icon: Clock },
   { value: 'ONGOING', label: 'Ongoing', icon: Clock },
   { value: 'COMPLETED', label: 'Completed', icon: CheckCircle2 },
-  { value: 'PENDING_PAYMENT', label: 'Pending Payment', icon: CircleDollarSign },
+  { value: 'OUTSTANDING', label: 'Outstanding', icon: CircleDollarSign },
 ];
 
 export function DashboardFilter() {

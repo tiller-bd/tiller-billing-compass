@@ -264,7 +264,7 @@ export default function ProjectsPage() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="ONGOING">Ongoing</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="PENDING_PAYMENT">Pending Payment</SelectItem>
+                <SelectItem value="OUTSTANDING">Outstanding</SelectItem>
               </SelectContent>
             </Select>
             {/* Year Type Selector - Fiscal prioritized */}

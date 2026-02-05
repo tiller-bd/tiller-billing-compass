@@ -101,7 +101,7 @@ export function DashboardMetrics({
   // Description for Total Received based on year selection
   const receivedDescription = useMemo(() => {
     if (isYearSelected && computed.receivedFromEarlierYears > 0) {
-      return `${computed.collectionPercent}% of year | +${formatCurrency(computed.receivedFromEarlierYears)} earlier dues`;
+      return `${computed.collectionPercent}% of year | +${formatCurrency(computed.receivedFromEarlierYears)} previous due`;
     }
     return `${computed.collectionPercent}% collected`;
   }, [isYearSelected, computed]);

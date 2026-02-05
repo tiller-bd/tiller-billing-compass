@@ -180,8 +180,8 @@ export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }
     switch (status) {
       case 'COMPLETED':
         return { label: 'Completed', color: 'bg-green-500/10 text-green-600 border-green-500/20' };
-      case 'PENDING_PAYMENT':
-        return { label: 'Pending Payment', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
+      case 'OUTSTANDING':
+        return { label: 'Outstanding', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
       case 'ONGOING':
       default:
         return { label: 'Ongoing', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
@@ -212,12 +212,12 @@ export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }
   };
 
   // Determine what status to set when marking complete
-  const getTargetStatus = (project: any): 'COMPLETED' | 'PENDING_PAYMENT' => {
+  const getTargetStatus = (project: any): 'COMPLETED' | 'OUTSTANDING' => {
     const recPct = project._receivedPct || 0;
     const isFullyPaid = recPct >= 100;
 
-    // If 100% paid -> COMPLETED, otherwise -> PENDING_PAYMENT
-    return isFullyPaid ? 'COMPLETED' : 'PENDING_PAYMENT';
+    // If 100% paid -> COMPLETED, otherwise -> OUTSTANDING
+    return isFullyPaid ? 'COMPLETED' : 'OUTSTANDING';
   };
 
   // Handle marking project as complete
@@ -240,7 +240,7 @@ export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }
       toast.success(
         targetStatus === 'COMPLETED'
           ? 'Project marked as Completed'
-          : 'Project marked as Pending Payment'
+          : 'Project marked as Outstanding'
       );
       onRefresh?.();
     } catch (error: any) {
@@ -489,7 +489,7 @@ export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }
                               </>
                             ) : (
                               <>
-                                <CircleDollarSign className="w-3.5 h-3.5 mr-2" /> Mark as Pending Payment
+                                <CircleDollarSign className="w-3.5 h-3.5 mr-2" /> Mark as Outstanding
                               </>
                             )}
                           </DropdownMenuItem>

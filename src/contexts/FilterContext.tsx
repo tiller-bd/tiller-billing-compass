@@ -9,7 +9,7 @@ export interface Suggestion {
   type: 'department' | 'client' | 'project' | 'status';
 }
 
-export type ProjectStatusFilter = 'all' | 'ONGOING' | 'COMPLETED' | 'PENDING_PAYMENT';
+export type ProjectStatusFilter = 'all' | 'ONGOING' | 'COMPLETED' | 'OUTSTANDING';
 
 interface FilterContextType {
   search: string;

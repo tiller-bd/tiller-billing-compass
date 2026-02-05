@@ -28,7 +28,7 @@ interface ChangeStatusDialogProps {
   onSuccess: () => void;
 }
 
-type ProjectStatus = 'ONGOING' | 'COMPLETED' | 'PENDING_PAYMENT';
+type ProjectStatus = 'ONGOING' | 'COMPLETED' | 'OUTSTANDING';
 
 export function ChangeStatusDialog({ project, onSuccess }: ChangeStatusDialogProps) {
   const [open, setOpen] = useState(false);
@@ -62,8 +62,8 @@ export function ChangeStatusDialog({ project, onSuccess }: ChangeStatusDialogPro
     switch (status) {
       case 'COMPLETED':
         return { label: 'Completed', color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle2 };
-      case 'PENDING_PAYMENT':
-        return { label: 'Pending Payment', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: CircleDollarSign };
+      case 'OUTSTANDING':
+        return { label: 'Outstanding', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: CircleDollarSign };
       case 'ONGOING':
       default:
         return { label: 'Ongoing', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20', icon: Clock };
@@ -146,10 +146,10 @@ export function ChangeStatusDialog({ project, onSuccess }: ChangeStatusDialogPro
                     <span>Completed</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="PENDING_PAYMENT">
+                <SelectItem value="OUTSTANDING">
                   <div className="flex items-center gap-2">
                     <CircleDollarSign size={14} className="text-amber-600" />
-                    <span>Pending Payment</span>
+                    <span>Outstanding</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -157,7 +157,7 @@ export function ChangeStatusDialog({ project, onSuccess }: ChangeStatusDialogPro
           </div>
 
           {/* Warning for unpaid bills */}
-          {hasUnpaidBills && (selectedStatus === 'COMPLETED' || selectedStatus === 'PENDING_PAYMENT') && (
+          {hasUnpaidBills && (selectedStatus === 'COMPLETED' || selectedStatus === 'OUTSTANDING') && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -198,7 +198,7 @@ export function ChangeStatusDialog({ project, onSuccess }: ChangeStatusDialogPro
 
               {selectedStatus === 'COMPLETED' && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 italic">
-                  Consider marking as "Pending Payment" instead if bills are still outstanding.
+                  Consider marking as "Outstanding" instead if bills are still unpaid.
                 </p>
               )}
             </div>

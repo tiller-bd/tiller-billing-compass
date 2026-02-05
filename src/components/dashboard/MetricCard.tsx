@@ -41,7 +41,7 @@ export function MetricCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="glass-card rounded-xl p-3 md:p-6 glow-effect h-[100px] md:h-[128px]"
+      className="glass-card rounded-xl p-3 md:p-6 glow-effect h-[120px] md:h-full"
     >
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-2 mb-2 md:mb-3">
@@ -61,8 +61,12 @@ export function MetricCard({
             )} />
           </div>
           <p className="text-[10px] md:text-sm text-muted-foreground font-medium truncate">{title}</p>
+          
         </div>
         <div className="mt-auto">
+          {description && (
+            <p className="text-[9px] md:text-xs text-muted-foreground mt-0.5">{description}</p>
+          )}
           <p className={cn(
             "text-base md:text-2xl font-bold tracking-tight",
             variant === 'primary' && "stat-value",
@@ -72,9 +76,7 @@ export function MetricCard({
           )}>
             {value}
           </p>
-          {description && (
-            <p className="text-[9px] md:text-xs text-muted-foreground mt-0.5">{description}</p>
-          )}
+          
         </div>
       </div>
     </motion.div>

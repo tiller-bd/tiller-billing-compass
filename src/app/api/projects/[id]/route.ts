@@ -105,9 +105,9 @@ export async function PATCH(
 
     // Handle status updates
     if (status !== undefined) {
-      const validStatuses = ['ONGOING', 'COMPLETED', 'PENDING_PAYMENT'];
+      const validStatuses = ['ONGOING', 'COMPLETED', 'OUTSTANDING'];
       if (!validStatuses.includes(status)) {
-        return apiError("Invalid status. Must be ONGOING, COMPLETED, or PENDING_PAYMENT", "VALIDATION_ERROR");
+        return apiError("Invalid status. Must be ONGOING, COMPLETED, or OUTSTANDING", "VALIDATION_ERROR");
       }
       updateData.status = status;
     }
