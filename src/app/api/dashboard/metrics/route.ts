@@ -51,35 +51,43 @@ export async function GET(request: NextRequest) {
     // Apply effective status filter
     const projects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
 
-    // Helper to check if a bill falls within the date range
-    // For year filtering, we use tentativeBillingDate to determine which year a bill belongs to
-    const isBillInDateRange = (bill: any): boolean => {
-      if (!dateRange) return true; // No year filter, include all
+    // Helper to check if a bill's tentative date falls within the date range (for budget)
+    const isBillScheduledInDateRange = (bill: any): boolean => {
+      if (!dateRange) return true;
       const billDate = bill.tentativeBillingDate ? new Date(bill.tentativeBillingDate) : null;
       if (!billDate) return false;
       return billDate >= dateRange.start && billDate <= dateRange.end;
     };
 
-    // Filter bills by year if dateRange is set
-    const allBills = projects.flatMap((p) => p.bills);
-    const filteredBills = dateRange
-      ? allBills.filter(isBillInDateRange)
-      : allBills;
+    // Helper to check if a bill's received date falls within the date range (for received/remaining)
+    const isBillReceivedInDateRange = (bill: any): boolean => {
+      if (!dateRange) return true;
+      const recDate = bill.receivedDate ? new Date(bill.receivedDate) : null;
+      if (!recDate) return false;
+      return recDate >= dateRange.start && recDate <= dateRange.end;
+    };
 
-    // New calculation logic:
-    // Total Budget = sum of ALL bills' billAmount in that year (regardless of status)
-    const totalBudget = filteredBills.reduce(
+    const allBills = projects.flatMap((p) => p.bills);
+
+    // Total Budget = bills scheduled (tentativeBillingDate) in the selected year
+    const scheduledBills = dateRange
+      ? allBills.filter(isBillScheduledInDateRange)
+      : allBills;
+    const totalBudget = scheduledBills.reduce(
       (sum, b) => sum + Number(b.billAmount || 0),
       0
     );
 
-    // Total Received = sum of PAID + PARTIAL bills' receivedAmount
-    const totalReceived = filteredBills
+    // Total Received = receivedAmount from bills where receivedDate is in the selected year
+    const receivedBills = dateRange
+      ? allBills.filter(isBillReceivedInDateRange)
+      : allBills;
+    const totalReceived = receivedBills
       .filter((b) => b.status === "PAID" || b.status === "PARTIAL")
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
 
-    // Total Remaining = PENDING bills' billAmount + PARTIAL bills' remaining (billAmount - receivedAmount)
-    const totalRemaining = filteredBills.reduce((sum, b) => {
+    // Total Remaining = scheduled bills that are PENDING or PARTIAL (remaining portion)
+    const totalRemaining = scheduledBills.reduce((sum, b) => {
       if (b.status === "PENDING") {
         return sum + Number(b.billAmount || 0);
       } else if (b.status === "PARTIAL") {
@@ -91,9 +99,9 @@ export async function GET(request: NextRequest) {
     }, 0);
 
     // PG (Project Guarantee) Calculations - based on projects, not bills
-    // Filter projects that have at least one bill in the date range, or all if no year filter
+    // Filter projects that have at least one bill scheduled in the date range
     const projectsWithBillsInRange = dateRange
-      ? projects.filter((p) => p.bills.some(isBillInDateRange))
+      ? projects.filter((p) => p.bills.some(isBillScheduledInDateRange))
       : projects;
 
     const pgDeposited = projectsWithBillsInRange.reduce(

@@ -128,7 +128,7 @@ Returns key financial metrics.
 | `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
 | `departmentId` | string | Department ID or `all` |
 | `clientId` | string | Client ID or `all` |
-| `projectId` | string | Project ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` (uses effective status logic) |
 | `search` | string | Search term for project/client name |
 
 **Response:**
@@ -145,13 +145,15 @@ Returns key financial metrics.
 ```
 
 **Calculation Logic:**
-- **Total Budget** = Sum of ALL bills' `billAmount` (regardless of status)
-- **Total Received** = Sum of PAID + PARTIAL bills' `receivedAmount`
-- **Total Remaining** = PENDING bills' `billAmount` + PARTIAL bills' (`billAmount` - `receivedAmount`)
+- **Total Budget** = Sum of bills scheduled (`tentativeBillingDate`) in the selected year
+- **Total Received** = Sum of PAID + PARTIAL bills' `receivedAmount` where `receivedDate` is in the selected year
+- **Total Remaining** = PENDING bills' `billAmount` + PARTIAL bills' (`billAmount` - `receivedAmount`) for bills scheduled in the year
+
+**Important:** Budget and Remaining use `tentativeBillingDate` for filtering, while Received uses `receivedDate`. This ensures revenue is credited to the period when payment was actually received, not when it was scheduled.
 
 **SQL Equivalent:**
 ```sql
--- Total Budget (sum of all bills)
+-- Total Budget (bills scheduled in the date range)
 SELECT SUM(pb.bill_amount) as total_budget
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
@@ -159,14 +161,14 @@ WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30'
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
   AND (p.client_id = :clientId OR :clientId IS NULL);
 
--- Total Received (PAID + PARTIAL bills' received amount)
+-- Total Received (PAID + PARTIAL bills where payment was RECEIVED in the date range)
 SELECT SUM(pb.received_amount) as total_received
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 WHERE pb.status IN ('PAID', 'PARTIAL')
-  AND pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30';
+  AND pb.received_date BETWEEN '2024-07-01' AND '2025-06-30';
 
--- Total Remaining (PENDING bills + PARTIAL bills' remaining)
+-- Total Remaining (PENDING + PARTIAL remaining, based on SCHEDULED date)
 SELECT SUM(
   CASE
     WHEN pb.status = 'PENDING' THEN pb.bill_amount
@@ -193,25 +195,40 @@ WHERE EXISTS (
 
 ### GET `/api/dashboard/revenue`
 
-Returns monthly revenue data for charts.
+Returns monthly revenue data for charts, including both received amounts and expected/scheduled amounts.
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` (defaults to current FY if `all`) |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
 [
-  { "month": "Jul", "received": 100000 },
-  { "month": "Aug", "received": 150000 },
+  { "month": "Jul", "received": 100000, "expected": 150000 },
+  { "month": "Aug", "received": 150000, "expected": 200000 },
   ...
 ]
 ```
 
+**Fields:**
+- **month** - Month name (Jul-Jun for fiscal year, Jan-Dec for calendar year)
+- **received** - Actual received amount based on `receivedDate` (PAID + PARTIAL bills)
+- **expected** - Scheduled/expected amount based on `tentativeBillingDate` (all bills)
+
+**Note:** When `year=all` is passed, defaults to current fiscal year for monthly breakdown (monthly data only makes sense within a single year).
+
 **SQL Equivalent:**
 ```sql
 -- For Fiscal Year (July-June)
+
+-- Received amounts (based on when payment was actually received)
 SELECT
   TO_CHAR(pb.received_date, 'Mon') as month,
-  EXTRACT(MONTH FROM pb.received_date) as month_num,
   SUM(pb.received_amount) as received
 FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
@@ -225,6 +242,22 @@ ORDER BY
     THEN EXTRACT(MONTH FROM pb.received_date) - 6
     ELSE EXTRACT(MONTH FROM pb.received_date) + 6
   END;
+
+-- Expected amounts (based on scheduled billing date)
+SELECT
+  TO_CHAR(pb.tentative_billing_date, 'Mon') as month,
+  SUM(pb.bill_amount) as expected
+FROM project_bills pb
+JOIN projects p ON pb.project_id = p.id
+WHERE pb.tentative_billing_date BETWEEN '2024-07-01' AND '2025-06-30'
+  AND (p.department_id = :departmentId OR :departmentId IS NULL)
+GROUP BY TO_CHAR(pb.tentative_billing_date, 'Mon'), EXTRACT(MONTH FROM pb.tentative_billing_date)
+ORDER BY
+  CASE
+    WHEN EXTRACT(MONTH FROM pb.tentative_billing_date) >= 7
+    THEN EXTRACT(MONTH FROM pb.tentative_billing_date) - 6
+    ELSE EXTRACT(MONTH FROM pb.tentative_billing_date) + 6
+  END;
 ```
 
 ---
@@ -236,9 +269,12 @@ Returns yearly revenue data aggregated across all years (used when "All Years" i
 **Query Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `search` | string | Search term for project/client name |
 | `departmentId` | string | Department ID or `all` |
 | `clientId` | string | Client ID or `all` |
-| `projectId` | string | Project ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+
+**Note:** This endpoint does NOT accept a `year` parameter as it aggregates across all years.
 
 **Response:**
 ```json
@@ -260,6 +296,8 @@ JOIN projects p ON pb.project_id = p.id
 WHERE pb.status IN ('PAID', 'PARTIAL')
   AND pb.received_date IS NOT NULL
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
+  AND (p.client_id = :clientId OR :clientId IS NULL)
+  AND (p.project_name ILIKE '%search%' OR :search IS NULL)
 GROUP BY EXTRACT(YEAR FROM pb.received_date)
 ORDER BY year;
 ```
@@ -270,7 +308,14 @@ ORDER BY year;
 
 Returns project distribution data for sunburst chart (Client -> Project hierarchy).
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
@@ -333,7 +378,14 @@ ORDER BY c.name, p.project_name;
 
 Returns budget vs received comparison per project.
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
@@ -378,7 +430,14 @@ GROUP BY p.id, p.project_name;
 
 Returns the 5 most recent payments received.
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` (filters by `receivedDate`) |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
@@ -401,8 +460,9 @@ FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 WHERE pb.status = 'PAID'
   AND pb.received_amount > 0
-  AND pb.received_date BETWEEN '2024-07-01' AND '2025-06-30'
+  AND (pb.received_date BETWEEN '2024-07-01' AND '2025-06-30' OR :year = 'all')
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
+  AND (p.client_id = :clientId OR :clientId IS NULL)
 ORDER BY pb.received_date DESC
 LIMIT 5;
 ```
@@ -411,9 +471,16 @@ LIMIT 5;
 
 ### GET `/api/dashboard/deadlines`
 
-Returns upcoming billing deadlines.
+Returns upcoming billing deadlines (bills due in the future that are not fully paid).
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
@@ -436,11 +503,14 @@ FROM project_bills pb
 JOIN projects p ON pb.project_id = p.id
 WHERE pb.status != 'PAID'
   AND pb.tentative_billing_date >= CURRENT_DATE
-  AND pb.tentative_billing_date <= '2025-06-30'
+  AND (pb.tentative_billing_date <= '2025-06-30' OR :year = 'all')
   AND (p.department_id = :departmentId OR :departmentId IS NULL)
+  AND (p.client_id = :clientId OR :clientId IS NULL)
 ORDER BY pb.tentative_billing_date ASC
 LIMIT 5;
 ```
+
+**Note:** The endpoint returns bills due from today onwards (future dates only), capped at 5 results.
 
 ---
 
@@ -448,7 +518,15 @@ LIMIT 5;
 
 Returns calendar events (project milestones, payments).
 
-**Query Parameters:** Same as `/api/dashboard/metrics` (except `search`)
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+
+**Note:** This endpoint does NOT support the `search` parameter.
 
 **Response:**
 ```json
@@ -536,7 +614,14 @@ WHERE pb.received_amount > 0
 
 Returns filtered projects for dashboard table.
 
-**Query Parameters:** Same as `/api/dashboard/metrics`
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `year` | string | `all`, `fy-2024-25`, or `cal-2024` |
+| `departmentId` | string | Department ID or `all` |
+| `clientId` | string | Client ID or `all` |
+| `status` | string | Project status filter: `all`, `ONGOING`, or `COMPLETED` |
+| `search` | string | Search term for project/client name |
 
 **Response:**
 ```json
@@ -1395,6 +1480,18 @@ projects (1) ─────────< project_bills (many)
 |--------|-------------|
 | `PENDING` | Project Guarantee not yet cleared |
 | `CLEARED` | Project Guarantee returned |
+
+### Project Status Values (Effective Status)
+
+The `status` query parameter in dashboard APIs uses "effective status" logic rather than a stored database field:
+
+| Status | Description |
+|--------|-------------|
+| `all` | No status filter - returns all projects |
+| `ONGOING` | Projects that have at least one bill with status `PENDING` or `PARTIAL` |
+| `COMPLETED` | Projects where ALL bills have status `PAID` |
+
+**Note:** A project is considered `COMPLETED` only when every single bill is fully paid. If even one bill is pending or partial, the project is `ONGOING`.
 
 ---
 

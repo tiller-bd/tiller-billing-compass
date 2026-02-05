@@ -59,8 +59,8 @@ export async function GET(request: NextRequest) {
   const filteredProjects = filterProjectsByEffectiveStatus(allProjects, status || 'all');
   const filteredProjectIds = filteredProjects.map(p => p.id);
 
-  // Get bills from filtered projects within date range
-  const bills = filteredProjectIds.length > 0
+  // Get bills with receivedDate in range (for actual received amounts)
+  const receivedBills = filteredProjectIds.length > 0
     ? await prisma.projectBill.findMany({
         where: {
           projectId: { in: filteredProjectIds },
@@ -73,24 +73,50 @@ export async function GET(request: NextRequest) {
       })
     : [];
 
+  // Get bills with tentativeBillingDate in range (for expected/scheduled amounts)
+  const scheduledBills = filteredProjectIds.length > 0
+    ? await prisma.projectBill.findMany({
+        where: {
+          projectId: { in: filteredProjectIds },
+          tentativeBillingDate: {
+            gte: start,
+            lte: end,
+          },
+        },
+      })
+    : [];
+
   // Use appropriate month ordering based on year type
   const months = isFiscal ? getFiscalYearMonths() : getCalendarYearMonths();
 
   const data = months.map((month, index) => {
-    const amount = bills
+    // Actual received in this month
+    const received = receivedBills
       .filter((b) => {
         if (!b.receivedDate) return false;
         const billDate = new Date(b.receivedDate);
         if (isFiscal) {
-          // For fiscal year, use fiscal month index (July=0, ..., June=11)
           return getFiscalMonthIndex(billDate) === index;
         } else {
-          // For calendar year, use standard month index (Jan=0, ..., Dec=11)
           return billDate.getMonth() === index;
         }
       })
       .reduce((sum, b) => sum + Number(b.receivedAmount || 0), 0);
-    return { month, received: amount };
+
+    // Expected/scheduled for this month (billAmount based on tentativeBillingDate)
+    const expected = scheduledBills
+      .filter((b) => {
+        if (!b.tentativeBillingDate) return false;
+        const billDate = new Date(b.tentativeBillingDate);
+        if (isFiscal) {
+          return getFiscalMonthIndex(billDate) === index;
+        } else {
+          return billDate.getMonth() === index;
+        }
+      })
+      .reduce((sum, b) => sum + Number(b.billAmount || 0), 0);
+
+    return { month, received, expected };
   });
 
   return NextResponse.json(data);

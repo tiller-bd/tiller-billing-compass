@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface RevenueChartProps {
-  data: { month: string; received: number }[];
+  data: { month: string; received: number; expected: number }[];
   yearlyData?: { year: string; received: number }[];
   loading?: boolean;
   loadingYearly?: boolean;
@@ -97,17 +97,24 @@ export function RevenueChart({
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.05} />
+                    <stop offset="0%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="hsl(173, 80%, 36%)" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="expectedGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(0, 65%, 55%)" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="hsl(0, 65%, 55%)" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" vertical={false} />
                 <XAxis dataKey={xKey} axisLine={false} tickLine={false} tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(215, 16%, 47%)', fontSize: 12 }} tickFormatter={(val) => `৳${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(val)}`} />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), 'Received']}
+                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'received' ? 'Received' : 'Expected']}
                   contentStyle={{ borderRadius: '8px', border: '1px solid hsl(214, 20%, 88%)' }}
                 />
+                {/* Expected (receivables) rendered first so it appears behind */}
+                <Area type="monotone" dataKey="expected" stroke="hsl(0, 60%, 55%)" strokeWidth={1.5} strokeOpacity={0.4} fill="url(#expectedGradient)" />
+                {/* Received rendered on top with solid appearance */}
                 <Area type="monotone" dataKey="received" stroke="hsl(173, 80%, 36%)" strokeWidth={2} fill="url(#revenueGradient)" />
               </AreaChart>
             ) : (
