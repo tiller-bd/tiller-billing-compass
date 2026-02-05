@@ -27,18 +27,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-  const stored = localStorage.getItem('auth_user');
-  if (stored) {
-    try {
-      // Remove the document.cookie check here because HttpOnly cookies 
-      // are invisible to client-side JS and will always return false.
-      setUser(JSON.parse(stored));
-    } catch {
-      localStorage.removeItem('auth_user');
+    const stored = localStorage.getItem('auth_user');
+    if (!stored) {
+      setIsHydrated(true);
+      return;
     }
-  }
-  setIsHydrated(true);
-}, []);
+
+    // Verify the httpOnly cookie is still valid with a server call.
+    // If the cookie expired, the server returns 401 and we clear stale localStorage.
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(res => {
+        if (res.ok) {
+          try {
+            setUser(JSON.parse(stored));
+          } catch {
+            localStorage.removeItem('auth_user');
+          }
+        } else {
+          // Session expired — clear stale data
+          localStorage.removeItem('auth_user');
+        }
+      })
+      .catch(() => {
+        // Network error — trust localStorage so offline/slow loads still work
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          localStorage.removeItem('auth_user');
+        }
+      })
+      .finally(() => {
+        setIsHydrated(true);
+      });
+  }, []);
 
   const handleActivity = useCallback(() => {
     if (!isLocked) setLastActivity(Date.now());
