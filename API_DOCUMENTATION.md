@@ -86,38 +86,6 @@ Clears the session cookie and logs out the user.
 
 ## Dashboard
 
-### GET `/api/dashboard`
-
-Returns all dashboard data in a single response (legacy endpoint).
-
-**Response:**
-```json
-{
-  "metrics": {
-    "totalBudget": 1000000,
-    "totalReceived": 500000,
-    "totalRemaining": 500000,
-    "lastReceived": { "projectName": "...", "amount": 10000, "date": "..." },
-    "upcomingDeadlines": [...]
-  },
-  "monthlyRevenue": [...],
-  "distribution": [...],
-  "budgetComparison": [...],
-  "projects": [...]
-}
-```
-
-**SQL Equivalent:**
-```sql
-SELECT p.*, pb.*, c.*, pc.*
-FROM projects p
-LEFT JOIN project_bills pb ON p.id = pb.project_id
-LEFT JOIN clients c ON p.client_id = c.id
-LEFT JOIN project_categories pc ON p.category_id = pc.id;
-```
-
----
-
 ### GET `/api/dashboard/metrics`
 
 Returns key financial metrics.
