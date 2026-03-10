@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Maximize2, RefreshCw, X, Shield, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
@@ -14,7 +14,6 @@ import { UpcomingDeadlines } from '@/components/dashboard/UpcomingDeadlines';
 import { LastReceived } from '@/components/dashboard/LastReceived';
 import { CalendarCard } from '@/components/dashboard/CalendarCard';
 import { ProjectTable } from '@/components/projects/ProjectTable';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useSharedFilters } from '@/contexts/FilterContext';
 import { DashboardFilter } from '@/components/dashboard/DashboardFilter';
@@ -34,6 +33,7 @@ export default function DashboardPage() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [chartSlid, setChartSlid] = useState(false);
   const [infoRowOpen, setInfoRowOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(true);
   const [isLg, setIsLg] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -267,7 +267,9 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-page-content">
-        <DashboardFilter />
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/40 -mx-4 md:-mx-6 px-4 md:px-6">
+          <DashboardFilter />
+        </div>
         {/* Top Metric Cards */}
         <DashboardMetrics
           departmentId={departmentId}
@@ -326,15 +328,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <Tabs defaultValue="charts">
-          <TabsList className="glass-card mb-4 w-full md:w-auto">
-            <TabsTrigger value="charts" className="flex-1 md:flex-none text-xs md:text-sm">Charts</TabsTrigger>
-            <TabsTrigger value="projects" className="flex-1 md:flex-none text-xs md:text-sm">Projects</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="charts" className="space-y-4 md:space-y-6">
+        <div className="space-y-4 md:space-y-6">
             {/* ── Sliding 150% row: Client Distribution ↔ Budget vs Received ── */}
-            <div className="relative overflow-hidden rounded-xl">
+            <div className="relative overflow-hidden rounded-xl px-[4%]">
 
               {/* Inner row — 150% wide, two equal cards (each 75% of container) */}
               <motion.div
@@ -406,15 +402,60 @@ export default function DashboardPage() {
               </div>
             </div> */}
 
+            {/* ── Projects Table (collapsible, default expanded) ── */}
+            <div className="glass-card rounded-xl overflow-hidden">
+              <div className="relative group/hdr flex items-center hover:bg-muted/40 transition-colors">
+                {/* clickable toggle area */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setProjectsOpen(o => !o)}
+                  onKeyDown={e => e.key === 'Enter' && setProjectsOpen(o => !o)}
+                  className="flex-1 flex items-center justify-between px-4 py-3 cursor-pointer select-none"
+                >
+                  <span className="text-sm font-semibold text-foreground">Projects</span>
+                  <motion.div animate={{ rotate: projectsOpen ? 180 : 0 }} transition={{ duration: 0.25 }}>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  </motion.div>
+                </div>
+                {/* refresh — sibling, not inside the toggle div */}
+                <div className="pr-2 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchProjects}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <AnimatePresence initial={false}>
+                {projectsOpen && (
+                  <motion.div
+                    key="projects-body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="border-t border-border/40">
+                      <ProjectTable projects={projects.map((p: any) => ({
+                        ...p,
+                        name: p.projectName,
+                        clientName: p.client?.name || 'Unknown',
+                        signDate: p.startDate,
+                        totalBudget: Number(p.totalProjectValue)
+                      }))} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* ── Collapsible info row: Last Received · Deadlines · Calendar ── */}
             <div className="glass-card rounded-xl overflow-hidden">
-              {/* Toggle header */}
               <button
                 onClick={() => setInfoRowOpen(o => !o)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  {/* Mobile: abbreviated labels */}
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground sm:hidden">
                     <span>Received</span>
                     <span className="text-border/60">·</span>
@@ -422,7 +463,6 @@ export default function DashboardPage() {
                     <span className="text-border/60">·</span>
                     <span>Calendar</span>
                   </span>
-                  {/* Desktop: full labels */}
                   <span className="hidden sm:flex items-center gap-2 text-sm font-semibold text-foreground">
                     <span>Last Received</span>
                     <span className="text-border/60">·</span>
@@ -435,8 +475,6 @@ export default function DashboardPage() {
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </motion.div>
               </button>
-
-              {/* Collapsible body */}
               <AnimatePresence initial={false}>
                 {infoRowOpen && (
                   <motion.div
@@ -448,7 +486,6 @@ export default function DashboardPage() {
                     style={{ overflow: 'hidden' }}
                   >
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_2fr] gap-4 p-4 border-t border-border/40">
-                      {/* Last Received */}
                       <div className="relative group">
                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchLastReceived}><RefreshCw className="h-3.5 w-3.5" /></Button>
@@ -456,7 +493,6 @@ export default function DashboardPage() {
                         </div>
                         <LastReceived loading={loadingStates.lastReceived} data={lastReceived} />
                       </div>
-                      {/* Upcoming Deadlines */}
                       <div className="relative group">
                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDeadlines}><RefreshCw className="h-3.5 w-3.5" /></Button>
@@ -464,7 +500,6 @@ export default function DashboardPage() {
                         </div>
                         <UpcomingDeadlines loading={loadingStates.deadlines} deadlines={deadlines} />
                       </div>
-                      {/* Calendar */}
                       <div className="relative group">
                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchCalendar}><RefreshCw className="h-3.5 w-3.5" /></Button>
@@ -477,24 +512,7 @@ export default function DashboardPage() {
                 )}
               </AnimatePresence>
             </div>
-          </TabsContent>
-          <TabsContent value="projects">
-            <div className="relative group">
-              <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchProjects}>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <ProjectTable projects={projects.map((p: any) => ({
-                ...p,
-                name: p.projectName,
-                clientName: p.client?.name || 'Unknown',
-                signDate: p.startDate,
-                totalBudget: Number(p.totalProjectValue)
-              }))} />
-            </div>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </>
   );

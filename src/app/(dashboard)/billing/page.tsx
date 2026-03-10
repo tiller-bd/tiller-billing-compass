@@ -171,8 +171,9 @@ export default function BillingMasterPage() {
           refreshTrigger={metricsRefreshTrigger}
         />
 
-        {/* Filter Bar - Scrollable on mobile */}
-        <div className="glass-card rounded-2xl border-border/50 shadow-sm p-3 md:p-4 overflow-x-auto">
+        {/* Filter Bar - Sticky on scroll */}
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/40 -mx-4 md:-mx-6 px-4 md:px-6 pb-3 md:pb-4">
+        <div className="glass-card rounded-2xl border-border/50 shadow-sm p-3 md:p-4 overflow-x-auto mt-0">
           <div className="flex md:grid md:grid-cols-5 gap-2 md:gap-3 min-w-max md:min-w-0">
             <Select value={project} onValueChange={setProject}>
               <SelectTrigger className="bg-secondary/30 border-none h-10 md:h-11 font-bold w-32 md:w-full text-xs md:text-sm">
@@ -234,6 +235,7 @@ export default function BillingMasterPage() {
               </Select>
             )}
           </div>
+        </div>
         </div>
 
         {loading ? (

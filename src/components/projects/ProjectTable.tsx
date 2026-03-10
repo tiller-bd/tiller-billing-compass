@@ -9,8 +9,10 @@ import {
   ExternalLink,
   CheckCircle2,
   CircleDollarSign,
-  Loader2
+  Loader2,
+  CheckCheck,
 } from 'lucide-react';
+import { getStatusConfig } from '@/components/projects/ChangeStatusDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -175,18 +177,8 @@ export function ProjectTable({ projects, onProjectClick, onRefresh, yearFilter }
     return { label: "??", color: "bg-muted text-muted-foreground border-border" };
   };
 
-  // Helper for Status Badge styling
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return { label: 'Completed', color: 'bg-green-500/10 text-green-600 border-green-500/20' };
-      case 'OUTSTANDING':
-        return { label: 'Outstanding', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
-      case 'ONGOING':
-      default:
-        return { label: 'Ongoing', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
-    }
-  };
+  // Delegate to shared config — single source of truth
+  const getStatusBadge = (status: string) => getStatusConfig(status);
 
   // Use Indian numbering system (Lakh/Crore): 1,00,00,000 for 1 crore, 1,00,000 for 1 lakh
   const formatFullCurrency = (val: number) => {

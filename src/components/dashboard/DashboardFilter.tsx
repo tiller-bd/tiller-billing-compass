@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { useSharedFilters, ProjectStatusFilter } from '@/contexts/FilterContext';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Clock, CheckCircle2, CircleDollarSign } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle2, CircleDollarSign, CheckCheck } from 'lucide-react';
 import { getCalendarYearOptions, getFiscalYearOptions, getCurrentFiscalYear, YearType } from '@/lib/date-utils';
 
 interface Option {
@@ -14,10 +14,11 @@ interface Option {
 }
 
 const STATUS_OPTIONS: { value: ProjectStatusFilter; label: string; icon: typeof Clock }[] = [
-  { value: 'all', label: 'All Statuses', icon: Clock },
-  { value: 'ONGOING', label: 'Ongoing', icon: Clock },
-  { value: 'COMPLETED', label: 'Completed', icon: CheckCircle2 },
-  { value: 'OUTSTANDING', label: 'Outstanding', icon: CircleDollarSign },
+  { value: 'all',              label: 'All Statuses',              icon: Clock           },
+  { value: 'ONGOING',          label: 'Ongoing',                   icon: Clock           },
+  { value: 'EXPENSE_COMPLETE', label: 'Expense Complete',          icon: CheckCheck      },
+  { value: 'COMPLETED',        label: 'Completed',                 icon: CheckCircle2    },
+  { value: 'OUTSTANDING',      label: 'Outstanding',               icon: CircleDollarSign},
 ];
 
 export function DashboardFilter() {

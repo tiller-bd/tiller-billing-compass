@@ -15,9 +15,9 @@ interface BudgetComparisonChartProps {
   isExpanded?: boolean;
 }
 
-const BAR_HEIGHT     = 26;
+const BAR_HEIGHT     = 30;
 const CHART_OVERHEAD = 72;
-const CARD_PADDING   = 80;
+const CARD_PADDING   = 90;
 
 // ── Flash shape rendered on hover (replaces recharts default active bar) ──────
 const FlashBar = (props: any) => {
@@ -50,6 +50,11 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
 
   const chartH = Math.max(240, data.length * BAR_HEIGHT + CHART_OVERHEAD);
   const cardH  = isExpanded ? '100%' : `${chartH + CARD_PADDING}px`;
+
+  // X-axis ticks at exactly 1 crore (1,00,00,000) intervals
+  const CR = 10_000_000;
+  const maxVal = Math.max(...data.map(d => d.received + d.remaining), 0);
+  const xTicks = Array.from({ length: Math.ceil(maxVal / CR) + 1 }, (_, i) => i * CR);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -102,7 +107,7 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
         <Skeleton className="w-full flex-1 rounded-lg" />
       ) : (
         <div className="flex-1 min-h-0">
-          <ResponsiveContainer width="100%" height={isExpanded ? '100%' : chartH}>
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"
@@ -121,6 +126,8 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
                 tickLine={false}
                 tick={{ fill: 'hsl(215,16%,37%)', fontSize: 11, fontWeight: 700 }}
                 tickFormatter={fmtCompact}
+                ticks={xTicks}
+                domain={[0, xTicks[xTicks.length - 1]]}
               />
               <YAxis
                 type="category"
@@ -148,7 +155,7 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
                 stackId="a"
                 name="Received"
                 fill="hsl(142,72%,29%)"
-                barSize={8}
+                barSize={10}
                 radius={[0, 0, 0, 0]}
                 isAnimationActive
                 animationDuration={400}
@@ -159,7 +166,7 @@ export function BudgetComparisonChart({ data, loading, isExpanded }: BudgetCompa
                 stackId="a"
                 name="Remaining"
                 fill="hsl(0,72%,51%)"
-                barSize={8}
+                barSize={10}
                 radius={[0, 4, 4, 0]}
                 isAnimationActive
                 animationDuration={400}

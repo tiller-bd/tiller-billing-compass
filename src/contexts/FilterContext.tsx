@@ -2,14 +2,15 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { YearType } from '@/lib/date-utils';
+import { ProjectStatusFilter } from '@/lib/project-status';
+
+export type { ProjectStatusFilter };
 
 export interface Suggestion {
   id: string;
   name: string;
   type: 'department' | 'client' | 'project' | 'status';
 }
-
-export type ProjectStatusFilter = 'all' | 'ONGOING' | 'COMPLETED' | 'OUTSTANDING';
 
 interface FilterContextType {
   search: string;

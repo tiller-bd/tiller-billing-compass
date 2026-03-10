@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { handlePrismaError, apiError } from "@/lib/api-error";
+import { PROJECT_STATUSES, canSetOutstanding } from "@/lib/project-status";
 
 export async function GET(
   request: NextRequest,
@@ -105,10 +106,24 @@ export async function PATCH(
 
     // Handle status updates
     if (status !== undefined) {
-      const validStatuses = ['ONGOING', 'COMPLETED', 'OUTSTANDING'];
-      if (!validStatuses.includes(status)) {
-        return apiError("Invalid status. Must be ONGOING, COMPLETED, or OUTSTANDING", "VALIDATION_ERROR");
+      if (!PROJECT_STATUSES.includes(status)) {
+        return apiError(
+          `Invalid status. Must be one of: ${PROJECT_STATUSES.join(', ')}`,
+          "VALIDATION_ERROR"
+        );
       }
+
+      // OUTSTANDING requires: all tentative dates passed + ≥1 unpaid bill
+      if (status === 'OUTSTANDING') {
+        const projectForCheck = { ...existingProject, bills: existingProject.bills };
+        if (!canSetOutstanding(projectForCheck)) {
+          return apiError(
+            "Cannot mark as Outstanding: requires all tentative billing dates to be past and at least one unpaid bill.",
+            "VALIDATION_ERROR"
+          );
+        }
+      }
+
       updateData.status = status;
     }
 

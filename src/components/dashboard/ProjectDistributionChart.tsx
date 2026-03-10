@@ -53,14 +53,14 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   const outerAnimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Radius config (responsive) ───────────────────────────────────────────
-  const PIE_OUT = isExpanded ? 165 : 138;
+  const PIE_OUT = isExpanded ? 158 : 132;
   const SB_CI   = isExpanded ? 70  : 52;
   const SB_CO   = isExpanded ? 125 : 92;
   const SB_PI   = isExpanded ? 130 : 97;
   const SB_PO   = isExpanded ? 190 : 143;
   const MARGINS = isExpanded
-    ? { top: 65, right: 95, bottom: 65, left: 95 }
-    : { top: 58, right: 78, bottom: 58, left: 78 };
+    ? { top: 55, right: 70, bottom: 88, left: 70 }
+    : { top: 42, right: 52, bottom: 80, left: 52 };
 
   // Set initial radii after first render
   useEffect(() => {
@@ -193,13 +193,13 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
 
   // ── Pie labels (always visible, hidden while animating) ───────────────────
   const renderPieLabel = ({ cx, cy, midAngle, outerRadius, name, percent, fill }: any) => {
-    if (isAnimating || isSunburst || percent < 0.04) return null;
+    if (isAnimating || isSunburst || percent < 0.03) return null;
     const RAD = Math.PI / 180;
-    const r   = outerRadius + (isExpanded ? 68 : 52);
+    const r   = outerRadius + (isExpanded ? 52 : 38);
     const x   = cx + r * Math.cos(-midAngle * RAD);
     const y   = cy + r * Math.sin(-midAngle * RAD);
-    const lx  = cx + (outerRadius + 8) * Math.cos(-midAngle * RAD);
-    const ly  = cy + (outerRadius + 8) * Math.sin(-midAngle * RAD);
+    const lx  = cx + (outerRadius + 6) * Math.cos(-midAngle * RAD);
+    const ly  = cy + (outerRadius + 6) * Math.sin(-midAngle * RAD);
     const pct = (percent * 100).toFixed(1);
     const lbl = `${name}  ${pct}%`;
     const w   = lbl.length * 6.1, pad = 6;
@@ -220,7 +220,7 @@ export function ProjectDistributionChart({ data, loading, isExpanded }: ProjectD
   const renderSunburstLabel = ({ cx, cy, midAngle, outerRadius, name, percent }: any) => {
     if (!showOuter || percent < 0.05) return null;
     const RAD   = Math.PI / 180;
-    const r     = outerRadius + (isExpanded ? 58 : 42);
+    const r     = outerRadius + (isExpanded ? 48 : 34);
     const x     = cx + r * Math.cos(-midAngle * RAD);
     const y     = cy + r * Math.sin(-midAngle * RAD);
     const short = name.length > 14 ? name.slice(0, 13) + '…' : name;
