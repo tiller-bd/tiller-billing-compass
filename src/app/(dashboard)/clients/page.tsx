@@ -211,6 +211,7 @@ export default function ClientsPage() {
                    ) : (
                      sortedData.map(client => (
                        <tr key={client.id} className="border-b border-border/30 hover:bg-primary/[0.02] cursor-pointer" onClick={() => router.push(`/clients/${client.id}`)}>
+
                           <td className="p-4"><p className="font-black text-foreground">{client.name}</p></td>
                           {visibleColumns.contact && <td className="p-4 text-xs font-medium text-muted-foreground">{client.contactPerson}</td>}
                           {visibleColumns.projects && <td className="p-4 text-center"><Badge variant="secondary" className="font-black">{client.projectCount}</Badge></td>}

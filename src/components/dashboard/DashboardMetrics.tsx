@@ -137,7 +137,7 @@ export function DashboardMetrics({
         </Button>
         <MetricCard
           loading={loading}
-          title="Total Budget"
+          title="Total Bill Amount"
           value={formatCurrency(computed.totalBudget)}
           icon={Wallet}
           variant="primary"

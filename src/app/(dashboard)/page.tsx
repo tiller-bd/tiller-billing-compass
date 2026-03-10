@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Maximize2, RefreshCw, X, Shield } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Maximize2, RefreshCw, X, Shield, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ProjectDistributionChart } from '@/components/dashboard/ProjectDistributionChart';
 import { BudgetComparisonChart } from '@/components/dashboard/BudgetComparisonChart';
@@ -30,6 +32,16 @@ export default function DashboardPage() {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [chartSlid, setChartSlid] = useState(false);
+  const [infoRowOpen, setInfoRowOpen] = useState(false);
+  const [isLg, setIsLg] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    setIsLg(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const { departmentId, clientId, status, yearType, selectedYear } = useSharedFilters();
 
@@ -321,8 +333,64 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="charts" className="space-y-4 md:space-y-6">
-            {/* Revenue & Budget Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            {/* ── Sliding 150% row: Client Distribution ↔ Budget vs Received ── */}
+            <div className="relative overflow-hidden rounded-xl">
+
+              {/* Inner row — 150% wide, two equal cards (each 75% of container) */}
+              <motion.div
+                className="flex"
+                style={{ width: '150%' }}
+                animate={{ x: chartSlid ? '-33.33%' : '0%' }}
+                transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+              >
+                {/* Card 1 — Client Distribution */}
+                <div className="flex-none pr-3" style={{ width: '50%' }}>
+                  <div className="relative group">
+                    <div className="absolute top-2 right-5 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDistribution}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('distribution')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                    <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
+                  </div>
+                </div>
+
+                {/* Card 2 — Budget vs Received */}
+                <div className="flex-none" style={{ width: '50%' }}>
+                  <div className="relative group">
+                    <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchBudgetComparison}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('budget')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                    <BudgetComparisonChart loading={loadingStates.budget} data={budgetComparison} />
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* ── Slide toggle button ── */}
+              <button
+                onClick={() => setChartSlid(s => !s)}
+                className={`absolute top-1/2 -translate-y-1/2 z-20 flex flex-col items-center justify-center
+                  gap-1 py-5 px-1.5 rounded-lg shadow-lg border border-border/60
+                  bg-background/80 backdrop-blur-sm hover:bg-background transition-all duration-300
+                  ${chartSlid ? 'left-2' : 'right-2'}`}
+                title={chartSlid ? 'Back to Client Distribution' : 'View Budget vs Received'}
+              >
+                {chartSlid
+                  ? <ChevronLeft  className="w-4 h-4 text-muted-foreground" />
+                  : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                }
+                <span
+                  className="text-[9px] font-medium text-muted-foreground"
+                  style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                >
+                  {chartSlid ? 'Distribution' : 'Budget'}
+                </span>
+              </button>
+
+            </div>
+
+            {/* Monthly Revenue — hidden for now */}
+            {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               <div className="relative group">
                 <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { fetchRevenue(); fetchRevenueYearly(); }}><RefreshCw className="h-3.5 w-3.5" /></Button>
@@ -336,46 +404,78 @@ export default function DashboardPage() {
                   isAllYears={selectedYear === 'all'}
                 />
               </div>
+            </div> */}
 
-              <div className="relative group">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchBudgetComparison}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('budget')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+            {/* ── Collapsible info row: Last Received · Deadlines · Calendar ── */}
+            <div className="glass-card rounded-xl overflow-hidden">
+              {/* Toggle header */}
+              <button
+                onClick={() => setInfoRowOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Mobile: abbreviated labels */}
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground sm:hidden">
+                    <span>Received</span>
+                    <span className="text-border/60">·</span>
+                    <span>Deadlines</span>
+                    <span className="text-border/60">·</span>
+                    <span>Calendar</span>
+                  </span>
+                  {/* Desktop: full labels */}
+                  <span className="hidden sm:flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <span>Last Received</span>
+                    <span className="text-border/60">·</span>
+                    <span>Upcoming Deadlines</span>
+                    <span className="text-border/60">·</span>
+                    <span>Project Calendar</span>
+                  </span>
                 </div>
-                <BudgetComparisonChart loading={loadingStates.budget} data={budgetComparison} />
-              </div>
-            </div>
+                <motion.div animate={{ rotate: infoRowOpen ? 180 : 0 }} transition={{ duration: 0.25 }} className="flex-shrink-0 ml-2">
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </motion.div>
+              </button>
 
-            {/* Distribution, Last Received, Deadlines */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              <div className="relative group md:col-span-2 lg:col-span-2">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDistribution}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('distribution')}><Maximize2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                <ProjectDistributionChart loading={loadingStates.distribution} data={distribution} />
-              </div>
-              <div className="relative group">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchLastReceived}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('lastReceived')}><Maximize2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                <LastReceived loading={loadingStates.lastReceived} data={lastReceived} />
-              </div>
-              <div className="relative group md:col-span-2 lg:col-span-1">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDeadlines}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('deadlines')}><Maximize2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                <UpcomingDeadlines loading={loadingStates.deadlines} deadlines={deadlines} />
-              </div>
-              <div className="relative group md:col-span-2 lg:col-span-2">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchCalendar}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('calendar')}><Maximize2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                <CalendarCard loading={loadingStates.calendar} events={calendarEvents} />
-              </div>
+              {/* Collapsible body */}
+              <AnimatePresence initial={false}>
+                {infoRowOpen && (
+                  <motion.div
+                    key="info-row"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_2fr] gap-4 p-4 border-t border-border/40">
+                      {/* Last Received */}
+                      <div className="relative group">
+                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchLastReceived}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('lastReceived')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <LastReceived loading={loadingStates.lastReceived} data={lastReceived} />
+                      </div>
+                      {/* Upcoming Deadlines */}
+                      <div className="relative group">
+                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchDeadlines}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('deadlines')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <UpcomingDeadlines loading={loadingStates.deadlines} deadlines={deadlines} />
+                      </div>
+                      {/* Calendar */}
+                      <div className="relative group">
+                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchCalendar}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setExpandedCard('calendar')}><Maximize2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <CalendarCard loading={loadingStates.calendar} events={calendarEvents} compact={isLg} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </TabsContent>
           <TabsContent value="projects">
