@@ -10,16 +10,27 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  full_name     String?
-  email         String   @unique
-  password_hash String
-  role          String?  @default("user")
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id              Int                   @id @default(autoincrement())
+  full_name       String?
+  email           String                @unique
+  password_hash   String
+  role            String?               @default("user")
+  is_active       Boolean               @default(true)
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+  dashboardLayout UserDashboardLayout?
 
   @@map("users")
+}
+
+model UserDashboardLayout {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("user_id")
+  layout    Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_dashboard_layouts")
 }
 
 model Client {
